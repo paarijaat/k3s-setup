@@ -2,6 +2,18 @@
 
 My notes on how to setup a single node k3s cluster, with a local docker registry outside the cluster, and installing istio, knative, prometheus, etc.
 
+The setup will run a docker container outside the k3s cluster as the local docker registry, shown below
+
+```bash
+$ docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                    NAMES
+3dedcfb8c3d7        registry:latest     "/entrypoint.sh /etc…"   14 minutes ago      Up 14 minutes       0.0.0.0:5000->5000/tcp   registry
+```
+
+and will install k3s, k9s, Istio, and Knative
+
+![alt text](k3s-setup.png "Screentshot of all the pods running after the setup")
+
 ## 1. Pre-requisites
 
 * Assumes a debian 9 VM named `paarijaat-debian-vm`.
