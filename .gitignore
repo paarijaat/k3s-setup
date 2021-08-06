@@ -1,0 +1,9 @@
+/registry/
+/istio-1.9.7/bin/
+/istio-1.9.7/manifests/
+/istio-1.9.7/samples/
+/istio-1.9.7/tools/
+/istio-1.9.7/LICENSE
+/istio-1.9.7/manifest.yaml
+/istio-1.9.7/README.md
+/prometheus/
