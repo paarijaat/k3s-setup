@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworld
+  labels:
+    app: helloworld
+    service: helloworld
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    name: http
+  selector:
+    app: helloworld
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld-python
+  labels:
+    app: helloworld
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld
+  template:
+    metadata:
+      labels:
+        app: helloworld
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: helloworld
+        image: paarijaat-debian-vm:5000/paarijaat/helloworld-python
+        resources:
+          requests:
+            cpu: "100m"
+        imagePullPolicy: IfNotPresent #Always
+        env:
+          - name: TARGET
+            value: "Python Sample v1"
+          - name: PORT
+            value: "8080"
+        ports:
+        - containerPort: 8080
+

@@ -1,0 +1,21 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: helloworld-python
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: helloworld
+        image: paarijaat-debian-vm:5000/paarijaat/helloworld-python
+        resources:
+          requests:
+            cpu: "100m"
+        imagePullPolicy: IfNotPresent #Always
+        env:
+          - name: TARGET
+            value: "Python Sample v1 Knative"
+        ports:
+        - containerPort: 8080
