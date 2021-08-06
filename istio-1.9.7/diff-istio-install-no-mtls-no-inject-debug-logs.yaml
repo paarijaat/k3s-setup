@@ -1,0 +1,13 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  meshConfig:
+    accessLogFile: /dev/stdout
+    enableAutoMtls: false
+  values:
+    global:
+      logging:
+        level: default:debug
+      proxy:
+        autoInject: disabled
+        logLevel: debug
