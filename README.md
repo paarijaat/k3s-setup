@@ -23,7 +23,7 @@ mkdir k3s
 cd k3s
 ```
 
-## Create a local docker registry with TLS and password protection
+## 2. Create a local docker registry with TLS and password protection
 
 ### Creating SSL certificate for docker registry
 
@@ -128,7 +128,7 @@ docker tag paarijaat/ubuntu:latest paarijaat-debian-vm:5000/paarijaat/ubuntu:lat
 docker push paarijaat-debian-vm:5000/paarijaat/ubuntu:latest
 ```
 
-## 2. Start k3s cluster
+## 3. Start k3s cluster
 
 ```bash
 ./setup-new-k3s.sh
@@ -354,13 +354,13 @@ Hello Python Sample v1!
 $ kubectl delete -f helloworld-python-local-docker-registry.yaml
 ```
 
-## 3. Install istio
+## 4. Install istio
 
 ```bash
 # NOTE istio 1.10.3 is messed up. kube-inject does not work
 $ export ISTIO_VERSION=1.9.7
 $ curl -L https://istio.io/downloadIstio | sh -
-$ export PATH="$PATH:/local/work/k3s/istio-1.9.7/bin"
+$ export PATH="$PATH:/local/work/k3s-setup/istio-1.9.7/bin"
 
 # I followed instructions at: https://istio.io/latest/docs/setup/install/istioctl/
 ```
@@ -418,7 +418,7 @@ kubectl apply -f helloworld-gateway.yaml
 curl http://localhost/hello
 ```
 
-## 4. Install Knative
+## 5. Install Knative
 
 I have followed instructions from:
 * [Installing Knative Serving using YAML files](https://knative.dev/docs/admin/install/serving/install-serving-with-yaml/)
