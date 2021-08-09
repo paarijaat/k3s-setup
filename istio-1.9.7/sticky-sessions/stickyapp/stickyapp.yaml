@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stickyapp
+  labels:
+    app: stickyapp
+    service: stickyapp
+spec:
+  #type: LoadBalancer
+  ports:
+  - port: 8080
+    name: http
+    targetPort: 8080
+  selector:
+    app: stickyapp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stickyapp
+  labels:
+    app: stickyapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: stickyapp
+  template:
+    metadata:
+      labels:
+        app: stickyapp
+    spec:
+      containers:
+      - name: stickyapp
+        image: paarijaat-debian-vm:5000/paarijaat/stickyapp
+        env:
+          - name: TARGET
+            value: "Sticky app v1"
+        resources:
+          requests:
+            cpu: "50m"
+        imagePullPolicy: IfNotPresent #Always
+        ports:
+        - containerPort: 8080

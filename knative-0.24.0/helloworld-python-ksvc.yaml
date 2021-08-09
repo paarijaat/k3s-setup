@@ -9,7 +9,7 @@ spec:
       - name: regcred
       containers:
       - name: helloworld
-        image: paarijaat-debian-vm:5000/paarijaat/helloworld-python
+        image: paarijaat-debian-vm:5000/paarijaat/stickyapp
         resources:
           requests:
             cpu: "100m"

@@ -1,0 +1,1857 @@
+[
+    {
+        "name": "BlackHoleCluster",
+        "type": "STATIC",
+        "connectTimeout": "10s",
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|80||activator-service.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|80||activator-service.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 80,
+                    "services": [
+                        {
+                            "host": "activator-service.knative-serving.svc.cluster.local",
+                            "name": "activator-service",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|81||activator-service.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|81||activator-service.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "http2ProtocolOptions": {
+            "maxConcurrentStreams": 1073741824
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 81,
+                    "services": [
+                        {
+                            "host": "activator-service.knative-serving.svc.cluster.local",
+                            "name": "activator-service",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8008||activator-service.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8008||activator-service.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 8008,
+                    "services": [
+                        {
+                            "host": "activator-service.knative-serving.svc.cluster.local",
+                            "name": "activator-service",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|9090||activator-service.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|9090||activator-service.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 9090,
+                    "services": [
+                        {
+                            "host": "activator-service.knative-serving.svc.cluster.local",
+                            "name": "activator-service",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "agent",
+        "type": "STATIC",
+        "connectTimeout": "0.250s",
+        "loadAssignment": {
+            "clusterName": "prometheus_stats",
+            "endpoints": [
+                {
+                    "lbEndpoints": [
+                        {
+                            "endpoint": {
+                                "address": {
+                                    "socketAddress": {
+                                        "address": "127.0.0.1",
+                                        "portValue": 15020
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "outbound|8080||autoscaler-bucket-00-of-01.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8080||autoscaler-bucket-00-of-01.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 8080,
+                    "services": [
+                        {
+                            "host": "autoscaler-bucket-00-of-01.knative-serving.svc.cluster.local",
+                            "name": "autoscaler-bucket-00-of-01",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8008||autoscaler.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8008||autoscaler.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 8008,
+                    "services": [
+                        {
+                            "host": "autoscaler.knative-serving.svc.cluster.local",
+                            "name": "autoscaler",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8080||autoscaler.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8080||autoscaler.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 8080,
+                    "services": [
+                        {
+                            "host": "autoscaler.knative-serving.svc.cluster.local",
+                            "name": "autoscaler",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|9090||autoscaler.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|9090||autoscaler.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 9090,
+                    "services": [
+                        {
+                            "host": "autoscaler.knative-serving.svc.cluster.local",
+                            "name": "autoscaler",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8008||controller.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8008||controller.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 8008,
+                    "services": [
+                        {
+                            "host": "controller.knative-serving.svc.cluster.local",
+                            "name": "controller",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|9090||controller.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|9090||controller.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 9090,
+                    "services": [
+                        {
+                            "host": "controller.knative-serving.svc.cluster.local",
+                            "name": "controller",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|443||domainmapping-webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|443||domainmapping-webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 443,
+                    "services": [
+                        {
+                            "host": "domainmapping-webhook.knative-serving.svc.cluster.local",
+                            "name": "domainmapping-webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8008||domainmapping-webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8008||domainmapping-webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 8008,
+                    "services": [
+                        {
+                            "host": "domainmapping-webhook.knative-serving.svc.cluster.local",
+                            "name": "domainmapping-webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|9090||domainmapping-webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|9090||domainmapping-webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 9090,
+                    "services": [
+                        {
+                            "host": "domainmapping-webhook.knative-serving.svc.cluster.local",
+                            "name": "domainmapping-webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|80||istio-ingressgateway.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|80||istio-ingressgateway.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "http2ProtocolOptions": {
+            "maxConcurrentStreams": 1073741824
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 80,
+                    "services": [
+                        {
+                            "host": "istio-ingressgateway.istio-system.svc.cluster.local",
+                            "name": "istio-ingressgateway",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|443||istio-ingressgateway.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|443||istio-ingressgateway.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 443,
+                    "services": [
+                        {
+                            "host": "istio-ingressgateway.istio-system.svc.cluster.local",
+                            "name": "istio-ingressgateway",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|15012||istio-ingressgateway.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|15012||istio-ingressgateway.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 15012,
+                    "services": [
+                        {
+                            "host": "istio-ingressgateway.istio-system.svc.cluster.local",
+                            "name": "istio-ingressgateway",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|15021||istio-ingressgateway.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|15021||istio-ingressgateway.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 15021,
+                    "services": [
+                        {
+                            "host": "istio-ingressgateway.istio-system.svc.cluster.local",
+                            "name": "istio-ingressgateway",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|15443||istio-ingressgateway.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|15443||istio-ingressgateway.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 15443,
+                    "services": [
+                        {
+                            "host": "istio-ingressgateway.istio-system.svc.cluster.local",
+                            "name": "istio-ingressgateway",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|443||istiod.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|443||istiod.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 443,
+                    "services": [
+                        {
+                            "host": "istiod.istio-system.svc.cluster.local",
+                            "name": "istiod",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|15010||istiod.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|15010||istiod.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "http2ProtocolOptions": {
+            "maxConcurrentStreams": 1073741824
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 15010,
+                    "services": [
+                        {
+                            "host": "istiod.istio-system.svc.cluster.local",
+                            "name": "istiod",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|15012||istiod.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|15012||istiod.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 15012,
+                    "services": [
+                        {
+                            "host": "istiod.istio-system.svc.cluster.local",
+                            "name": "istiod",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|15014||istiod.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|15014||istiod.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 15014,
+                    "services": [
+                        {
+                            "host": "istiod.istio-system.svc.cluster.local",
+                            "name": "istiod",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|80||knative-local-gateway.istio-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|80||knative-local-gateway.istio-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "http2ProtocolOptions": {
+            "maxConcurrentStreams": 1073741824
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 80,
+                    "services": [
+                        {
+                            "host": "knative-local-gateway.istio-system.svc.cluster.local",
+                            "name": "knative-local-gateway",
+                            "namespace": "istio-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|53||kube-dns.kube-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|53||kube-dns.kube-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 53,
+                    "services": [
+                        {
+                            "host": "kube-dns.kube-system.svc.cluster.local",
+                            "name": "kube-dns",
+                            "namespace": "kube-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|9153||kube-dns.kube-system.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|9153||kube-dns.kube-system.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 9153,
+                    "services": [
+                        {
+                            "host": "kube-dns.kube-system.svc.cluster.local",
+                            "name": "kube-dns",
+                            "namespace": "kube-system"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|443||kubernetes.default.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|443||kubernetes.default.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 443,
+                    "services": [
+                        {
+                            "host": "kubernetes.default.svc.cluster.local",
+                            "name": "kubernetes",
+                            "namespace": "default"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|443||net-istio-webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|443||net-istio-webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 443,
+                    "services": [
+                        {
+                            "host": "net-istio-webhook.knative-serving.svc.cluster.local",
+                            "name": "net-istio-webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8008||net-istio-webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8008||net-istio-webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 8008,
+                    "services": [
+                        {
+                            "host": "net-istio-webhook.knative-serving.svc.cluster.local",
+                            "name": "net-istio-webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|9090||net-istio-webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|9090||net-istio-webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 9090,
+                    "services": [
+                        {
+                            "host": "net-istio-webhook.knative-serving.svc.cluster.local",
+                            "name": "net-istio-webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "prometheus_stats",
+        "type": "STATIC",
+        "connectTimeout": "0.250s",
+        "loadAssignment": {
+            "clusterName": "prometheus_stats",
+            "endpoints": [
+                {
+                    "lbEndpoints": [
+                        {
+                            "endpoint": {
+                                "address": {
+                                    "socketAddress": {
+                                        "address": "127.0.0.1",
+                                        "portValue": 15000
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "sds-grpc",
+        "type": "STATIC",
+        "connectTimeout": "1s",
+        "loadAssignment": {
+            "clusterName": "sds-grpc",
+            "endpoints": [
+                {
+                    "lbEndpoints": [
+                        {
+                            "endpoint": {
+                                "address": {
+                                    "pipe": {
+                                        "path": "./etc/istio/proxy/SDS"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "http2ProtocolOptions": {}
+    },
+    {
+        "name": "outbound|8080||stickyapp.default.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8080||stickyapp.default.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "config": "/apis/networking.istio.io/v1alpha3/namespaces/default/destination-rule/stickyapp-hybrid",
+                    "default_original_port": 8080,
+                    "services": [
+                        {
+                            "host": "stickyapp.default.svc.cluster.local",
+                            "name": "stickyapp",
+                            "namespace": "default"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8080|direct|stickyapp.default.svc.cluster.local",
+        "type": "ORIGINAL_DST",
+        "connectTimeout": "10s",
+        "lbPolicy": "CLUSTER_PROVIDED",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "originalDstLbConfig": {
+            "useHttpHeader": true
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "config": "/apis/networking.istio.io/v1alpha3/namespaces/default/destination-rule/stickyapp-hybrid",
+                    "default_original_port": 8080,
+                    "services": [
+                        {
+                            "host": "stickyapp.default.svc.cluster.local",
+                            "name": "stickyapp",
+                            "namespace": "default"
+                        }
+                    ],
+                    "subset": "direct"
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8080|normal|stickyapp.default.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8080|normal|stickyapp.default.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "config": "/apis/networking.istio.io/v1alpha3/namespaces/default/destination-rule/stickyapp-hybrid",
+                    "default_original_port": 8080,
+                    "services": [
+                        {
+                            "host": "stickyapp.default.svc.cluster.local",
+                            "name": "stickyapp",
+                            "namespace": "default"
+                        }
+                    ],
+                    "subset": "normal"
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|443||webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|443||webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 443,
+                    "services": [
+                        {
+                            "host": "webhook.knative-serving.svc.cluster.local",
+                            "name": "webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|8008||webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|8008||webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 8008,
+                    "services": [
+                        {
+                            "host": "webhook.knative-serving.svc.cluster.local",
+                            "name": "webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "outbound|9090||webhook.knative-serving.svc.cluster.local",
+        "type": "EDS",
+        "edsClusterConfig": {
+            "edsConfig": {
+                "ads": {},
+                "resourceApiVersion": "V3"
+            },
+            "serviceName": "outbound|9090||webhook.knative-serving.svc.cluster.local"
+        },
+        "connectTimeout": "10s",
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 4294967295,
+                    "maxPendingRequests": 4294967295,
+                    "maxRequests": 4294967295,
+                    "maxRetries": 4294967295
+                }
+            ]
+        },
+        "metadata": {
+            "filterMetadata": {
+                "istio": {
+                    "default_original_port": 9090,
+                    "services": [
+                        {
+                            "host": "webhook.knative-serving.svc.cluster.local",
+                            "name": "webhook",
+                            "namespace": "knative-serving"
+                        }
+                    ]
+                }
+            }
+        },
+        "filters": [
+            {
+                "name": "istio.metadata_exchange",
+                "typedConfig": {
+                    "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+                    "typeUrl": "type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange",
+                    "value": {
+                        "protocol": "istio-peer-exchange"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "xds-grpc",
+        "type": "STATIC",
+        "connectTimeout": "1s",
+        "loadAssignment": {
+            "clusterName": "xds-grpc",
+            "endpoints": [
+                {
+                    "lbEndpoints": [
+                        {
+                            "endpoint": {
+                                "address": {
+                                    "pipe": {
+                                        "path": "./etc/istio/proxy/XDS"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "maxRequestsPerConnection": 1,
+        "circuitBreakers": {
+            "thresholds": [
+                {
+                    "maxConnections": 100000,
+                    "maxPendingRequests": 100000,
+                    "maxRequests": 100000
+                },
+                {
+                    "priority": "HIGH",
+                    "maxConnections": 100000,
+                    "maxPendingRequests": 100000,
+                    "maxRequests": 100000
+                }
+            ]
+        },
+        "http2ProtocolOptions": {},
+        "upstreamConnectionOptions": {
+            "tcpKeepalive": {
+                "keepaliveTime": 300
+            }
+        }
+    },
+    {
+        "name": "zipkin",
+        "type": "STRICT_DNS",
+        "connectTimeout": "1s",
+        "loadAssignment": {
+            "clusterName": "zipkin",
+            "endpoints": [
+                {
+                    "lbEndpoints": [
+                        {
+                            "endpoint": {
+                                "address": {
+                                    "socketAddress": {
+                                        "address": "zipkin.istio-system",
+                                        "portValue": 9411
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "dnsRefreshRate": "30s",
+        "respectDnsTtl": true,
+        "dnsLookupFamily": "V4_ONLY"
+    }
+]

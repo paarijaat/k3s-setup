@@ -1,0 +1,46 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: stickyapp-gateway
+spec:
+  selector:
+    istio: ingressgateway # use istio default controller
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: stickyapp-consistent
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - stickyapp-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/stickyapp"
+    rewrite:
+      uri: "/"
+    route:
+    - destination:
+        host: stickyapp.default.svc.cluster.local
+        port:
+          number: 8080
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+    name: stickyapp-consistent
+spec:
+    host: stickyapp.default.svc.cluster.local
+    trafficPolicy:
+      loadBalancer:
+        consistentHash:
+          httpHeaderName: x-user

@@ -1,0 +1,17 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: stickyapp-envoyfilter-hybrid
+  namespace: istio-system
+spec:
+  configPatches:
+  - applyTo: CLUSTER
+    match:
+      context: GATEWAY
+      cluster:
+        name: "outbound|8080|direct|stickyapp.default.svc.cluster.local"
+    patch:
+      operation: MERGE
+      value: 
+        original_dst_lb_config:
+          use_http_header: true
