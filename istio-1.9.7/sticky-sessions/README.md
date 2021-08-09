@@ -11,6 +11,7 @@
 * [Making Istio Work with Kubernetes StatefulSet and Headless Services](https://medium.com/airy-science/making-istio-work-with-kubernetes-statefulset-and-headless-services-d5725c8efcc9)
 * [Original destination](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/original_dst#arch-overview-load-balancing-types-original-destination)
 * <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto#envoy-v3-api-field-config-cluster-v3-cluster-originaldstlbconfig-use-http-header>
+* [Istio Request Control with Envoy Filters — Request Headers](https://medium.com/hepsiburadatech/istio-request-control-with-envoy-filters-request-headers-43dbd0dba7a9)
 
 
 ## EnvoyFilter references

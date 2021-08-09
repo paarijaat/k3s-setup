@@ -1,0 +1,4832 @@
+    NOTE: The following instructions only work on machines that are NOT behind any http/https proxy
+
+# Resouces required: 
+* Atleast 24 GB RAM + 50 GB disk space
+* These following stpes will create a 3 VM Kubernetes/Knative developement cluster. 
+* Each VM has been configured to use 8GB RAM and 40GB disk space.
+    * Values for each VM can be configured in 'Vagrantfile'
+
+# Install VirtualBox
+# Install vagrant
+    https://www.vagrantup.com/
+# [OPTIONAL] Install visual studio code and enable remote developement
+    https://code.visualstudio.com/docs/remote/remote-overview
+# [OPTIONAL] Install windows terminal, and make powershell as the default. This will allow you to ssh into the VM
+# Open virtual box gui
+
+# Launch a windows cmd shell with admin priviledges [right click on cmd]
+copy the Vagrantfile to C:\local\work\kubernetes_cluster
+cd C:\local\work\kubernetes_cluster
+
+vagrant plugin install vagrant-vbguest
+vagrant plugin install vagrant-disksize
+increase the RAM to 10GB
+vagrant up
+
+(Do the stuff in brackets below, only if you intend to install the VMs again and again.)
+(shutdown VMs from virtualbox interface (sudo shutdown now), create clones of the VMs - keep hardware UUIDs same, delete previous VMs and rename the clones)
+(the .vmdk files created by vagrant installation is unusable if we reimport the VM in to virtualbox. By creating a clone, a proper .vmdk file is created)
+
+ssh into node1   (e.g. using vscode, see config file at the end below, may have to remove an old VM from known_hosts file)
+
+# Enable passwordless ssh into all nodes from node1 
+ssh-keygen
+ssh-copy-id -i ~/.ssh/id_rsa.pub vagrant@node1
+ssh-copy-id -i ~/.ssh/id_rsa.pub vagrant@node2
+ssh-copy-id -i ~/.ssh/id_rsa.pub vagrant@node3
+ssh-copy-id -i ~/.ssh/id_rsa.pub vagrant@node4
+
+# Ensure  the following packages are not installed in the VMs: docker-ce, docker-ce-cli, containerd.io
+
+# Get Kubespray and configure it
+git clone https://github.com/kubernetes-sigs/kubespray.git
+cd kubespray
+
+# Install dependencies from ``requirements.txt``
+sudo pip3 install -r requirements.txt
+
+# Copy 'inventory/sample' as 'inventory/mycluster'
+cp -rfp inventory/sample inventory/mycluster
+
+# Update Ansible inventory file with inventory builder
+declare -a IPS=(192.168.33.11 192.168.33.12 192.168.33.13)
+
+CONFIG_FILE=inventory/mycluster/hosts.yaml python3 contrib/inventory_builder/inventory.py ${IPS[@]}
+
+# Review and change parameters under ``inventory/mycluster/group_vars``  and hosts.yaml
+
+
+contents of hosts.yaml
+----------------------
+all:
+  hosts:
+    node1:
+      ansible_host: 192.168.33.11
+      ip: 192.168.33.11
+      access_ip: 192.168.33.11
+    node2:
+      ansible_host: 192.168.33.12
+      ip: 192.168.33.12
+      access_ip: 192.168.33.12
+    node3:
+      ansible_host: 192.168.33.13
+      ip: 192.168.33.13
+      access_ip: 192.168.33.13
+  children:
+    kube-master:
+      hosts:
+        node1:
+    kube-node:
+      hosts:
+        node1:
+        node2:
+        node3:
+    etcd:
+      hosts:
+        node1:
+    k8s-cluster:
+      children:
+        kube-master:
+        kube-node:
+    calico-rr:
+      hosts: {}
+
+
+docker.yaml
+-----------
+
+## An obvious use case is allowing insecure-registry access to self hosted registries.
+## Can be ipaddress and domain_name.
+## example define 172.19.16.11 or mirror.registry.io
+docker_insecure_registries:
+  - registry.kube-system.svc.cluster.local:5000
+
+
+
+addons.xml
+----------
+
+---
+dashboard_enabled: false
+helm_enabled: false
+
+# Registry deployment
+registry_enabled: true
+registry_namespace: kube-system
+registry_storage_class: ""
+registry_disk_size: "10Gi"
+
+metrics_server_enabled: false
+local_path_provisioner_enabled: false
+metallb_enabled: false
+
+
+
+all.yaml
+--------
+(no changes required)
+
+
+k8s-cluster.yaml
+---------------
+
+## Change this to use another Kubernetes version, e.g. a current beta release
+kube_version: v1.19.3
+#kube_version: v1.20.2
+
+# Choose network plugin (cilium, calico, contiv, weave or flannel. Use cni for generic cni plugin)
+# Can also be set to 'cloud', which lets the cloud provider setup appropriate routing
+kube_network_plugin: calico
+
+kube_apiserver_insecure_port: 8080  # (http)
+# kube_apiserver_insecure_port: 0  # (disabled)
+
+# Kube-proxy proxyMode configuration.
+# Can be ipvs, iptables
+kube_proxy_mode: ipvs
+
+# configure arp_ignore and arp_announce to avoid answering ARP queries from kube-ipvs0 interface
+# must be set to true for MetalLB to work
+kube_proxy_strict_arp: false
+
+# Can be docker_dns, host_resolvconf or none
+resolvconf_mode: host_resolvconf
+
+# Make a copy of kubeconfig on the host that runs Ansible in {{ inventory_dir }}/artifacts
+kubeconfig_localhost: true
+# Download kubectl onto the host that runs Ansible in {{ bin_dir }}
+kubectl_localhost: true
+
+-----------------------------------------
+
+
+extra_playbooks/roles/kubernetes/preinstall/vars/ubuntu.yml
+------------------------------------------------------------
+required_pkgs:
+  - python3-apt
+  - aufs-tools
+  - apt-transport-https
+  - software-properties-common
+  - conntrack
+-----------------------------------------
+
+extra_playbooks/roles/container-engine/docker/defaults/main.yml
+---------------------------------------------------------------
+docker_version: '20.10'
+
+
+extra_playbooks/roles/container-engine/containerd-common/defaults/main.yml
+---------------------------------------------------------------
+containerd_version: 'latest'
+-----------------------------------------
+
+#Install kubernetes cluster
+# Deploy Kubespray with Ansible Playbook - run the playbook as root
+# The option `--become` is required, as for example writing SSL keys in /etc/,
+# installing packages and interacting with various systemd daemons.
+# Without --become the playbook will fail to run!
+ansible-playbook -v -i inventory/mycluster/hosts.yaml  --become --become-user=root --user=vagrant cluster.yml
+
+sudo cp -r /root/.kube ~/.
+sudo chown -R vagrant:vagrant ~/.kube
+
+# Copy config file for kubectl
+mkdir -p ~/.kube
+cp ~/kubespray/inventory/mycluster/artifacts/admin.conf ~/.kube/config
+kubectl get nodes
+
+# Set 'k' as alias for 'kubectl'
+
+edit ~/.bashrc
+--------------
+alias k='kubectl'
+source ~/.bashrc
+
+# Check if registries are reachable
+curl http://192.168.33.11:5000/v2/_catalog
+curl http://localhost:5000/v2/_catalog
+curl http://registry.kube-system.svc.cluster.local:5000/v2/_catalog  (this will check if the cluster DNS can be reached from outside)
+
+# Add user to docker group
+sudo usermod -a -G docker vagrant
+
+
+#Install helm
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+chmod 700 get_helm.sh
+./get_helm.sh
+
+
+
+# Install MetalLB (to enable Services of type LoadBalancer)
+https://metallb.universe.tf/installation/
+
+kubectl edit configmap -n kube-system kube-proxy
+  set strictARP: true
+
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.9.5/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.9.5/manifests/metallb.yaml
+# On first install only
+kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"
+
+create metallb_config.yaml
+------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2      
+      addresses:
+      - 192.168.33.150-192.168.33.170
+
+k apply -f metallb_config.yaml
+
+Test LoadBalancer service (create test_metallb.yaml)
+--------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx-deploy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-deploy
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: nginx
+
+k apply -f test_metallb.yaml
+
+k get svc nginx-deploy  (note the External-IP, e.g. 192.168.33.150)
+
+Open browser on host machine and access http://192.168.33.150   (or whatever is the Extern-IP assigned)
+
+
+# local-path-provisioner
+------------------------
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+wget https://raw.githubusercontent.com/rancher/local-path-provisioner/master/examples/pvc/pvc.yaml
+(edit pvc.yaml to remove the storageclass line)
+contents of  edited pvc.yaml
+----------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-path-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 128Mi
+
+k apply -f pvc.yaml
+kubectl create -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/examples/pod/pod.yaml
+k get pvc
+  should show status as BOUND
+
+kubectl delete -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/examples/pod/pod.yaml
+k delete -f pvc.yaml
+
+
+Metrics server
+---------------
+https://github.com/kubernetes-sigs/metrics-server
+
+wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+edit components.yaml   (set - --kubelet-insecure-tls)
+--------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=4443
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --kubelet-insecure-tls    <-- THIS
+        image: k8s.gcr.io/metrics-server/metrics-server:v0.4.2
+
+kubectl apply -f components.yaml
+after 60 seconds try:
+kubectl top nodes
+
+
+K9s [lightweight shell GUI]
+---------------------------
+https://github.com/derailed/k9s/releases
+mkdir k9s; cd k9s
+wget https://github.com/derailed/k9s/releases/download/v0.24.14/k9s_Linux_x86_64.tar.gz
+tar -zxvf k9s_Linux_x86_64.tar.gz
+sudo cp k9s /usr/local/bin/.
+
+make sure that ~/.kube/config exits
+
+https://k9scli.io
+k9s help
+k9s info
+    vagrant@node1:~$ k9s info
+     ____  __.________       
+    |    |/ _/   __   \______
+    |      < \____    /  ___/
+    |    |  \   /    /\___ \ 
+    |____|__ \ /____//____  >
+            \/            \/ 
+
+    Configuration:   /home/vagrant/.k9s/config.yml    (update this file to change refresh interval and default namespace to start in)
+    Logs:            /tmp/k9s-vagrant.log
+    Screen Dumps:    /tmp/k9s-screens-vagrant
+
+
+k9s -A   (to start with All namespace)
+k9s -A --readonly  (start in readonly mode)
+k9s -n default (start in default namespace)
+
+    ?  key bindings
+    ESC (to go back)
+    ctrl+c to exit
+    :po  show pods
+    :svc show svc
+    0  show pods from all namespaces
+
+create ~/.k9s/views.yml
+-----------------------
+k9s:
+  views:
+    # Alters the pod view column layout. Uses GVR as key
+    v1/pods:
+      columns:
+        - NAMESPACE
+        - NAME
+        - READY
+        - STATUS
+        - RESTARTS
+        - AGE
+        - IP
+        - NODE
+        - CPU
+        - CPU/R:L
+        - MEM
+        - MEM/R:L
+
+    # Alters the service view column layout
+    v1/services:
+      columns:
+        - NAMESPACE
+        - NAME
+        - TYPE
+        - CLUSTER-IP
+        - EXTERNAL-IP
+        - AGE
+        - PORTS
+        - SELECTOR
+
+
+Kubernetes Dashboard  [Heavier, browser GUI, Optional]
+--------------------------------
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml
+
+Create a sample user:
+https://github.com/kubernetes/dashboard/blob/master/docs/user/access-control/creating-sample-user.md
+
+dashboard-sample-user.yaml
+-----------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+
+k apply -f dashboard-sample-user.yaml
+
+Get bearer token:
+kubectl -n kubernetes-dashboard get secret $(kubectl -n kubernetes-dashboard get sa/admin-user -o jsonpath="{.secrets[0].name}") -o go-template="{{.data.token | base64decode}}"
+
+Open another shell window in vscode (note, vscode automatically exposes port 8005 on localhost windows for the browser to access)
+kubectl proxy --address='0.0.0.0' --port=8005
+
+http://localhost:8005/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/.
+
+
+Install istio
+---------------
+
+export ISTIO_VERSION=1.9.2
+curl -L https://istio.io/downloadIstio | sh -
+export PATH="$PATH:/home/vagrant/istio-1.9.2/bin"
+
+Follow instructions at:
+https://knative.dev/docs/install/installing-istio/#installing-istio-without-sidecar-injection
+
+
+cp manifests/profiles/default.yaml istio-default-no-inject-no-mtls-debug-logs.yaml
+-----------------------------------------------------------------------------------
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  meshConfig:
+    accessLogFile: /dev/stdout    # <--- THIS
+    enableAutoMtls: false    # <--- THIS
+  components:
+    # Istio Gateway feature
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        service:
+          ports:
+            - port: 80
+              targetPort: 8080
+              nodePort: 31380  # <--- THIS
+              name: http2
+              protocol: TCP
+
+      # <--- THIS ENTIRE SECTION --- Currently optional>
+    - name: cluster-local-gateway    
+      enabled: true
+      label:
+        istio: cluster-local-gateway
+        app: cluster-local-gateway
+      k8s:
+        service:
+          type: ClusterIP
+          ports:
+          - port: 15020
+            targetPort: 15020
+            name: status-port
+          - port: 80
+            targetPort: 8080
+            name: http2
+          - port: 443
+            targetPort: 8443
+            name: https
+
+  values:
+    global:
+      logging:
+        level: "default:debug"
+      jwtPolicy: first-party-jwt     # <--- THIS
+      proxy:
+        autoInject: disabled         # <--- THIS
+        logLevel: debug              # <--- THIS
+      ingressgateway:
+        type: LoadBalancer
+        loadBalancerIP: 192.168.33.150    # <-- THIS
+
+
+istioctl manifest generate -f istio-default-no-inject-no-mtls-debug-logs.yaml > manifest-default-no-inject-no-mtls-debug-logs.yaml
+
+edit manifest-default-no-inject-no-mtls-debug-logs:
+-------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: istio-ingressgateway
+  namespace: istio-system
+spec:
+  replicas: 3   # <-- ADD THIS  (optional)
+  template:
+    spec:
+      affinity:
+        # <-- ADD THIS SECTION --   Optional, Needed only when you are adding hostPort below>
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: istio-ingressgateway
+            topologyKey: kubernetes.io/hostname
+
+      containers:
+        image: docker.io/istio/proxyv2:1.8.2
+        name: istio-proxy
+        ports:
+        - containerPort: 15021
+          protocol: TCP
+        - containerPort: 8080
+          hostPort: 80  # <-- ADD THIS  (optional)
+          protocol: TCP
+        - containerPort: 8443
+          hostPort: 443  # <-- ADD THIS  (optional)
+
+kubectl create namespace istio-system
+k -n istio-system apply -f manifest-default-no-inject-no-mtls-debug-logs.yaml
+(may have to run it again, if it shows EnvoyFilter errors)
+
+
+If you have enabled hostPort then it should show up in iptables:
+sudo iptables -t nat -L -v --line-numbers
+
+      should contain something like:
+        Chain CNI-DN-9d027f884a9eedbe248f0 (1 references)
+        target     prot opt source               destination         
+        CNI-HOSTPORT-SETMARK  tcp  --  10.233.90.4          anywhere             tcp dpt:http
+        CNI-HOSTPORT-SETMARK  tcp  --  localhost            anywhere             tcp dpt:http
+        DNAT       tcp  --  anywhere             anywhere             tcp dpt:http to:10.233.90.4:8080
+        CNI-HOSTPORT-SETMARK  tcp  --  10.233.90.4          anywhere             tcp dpt:https
+        CNI-HOSTPORT-SETMARK  tcp  --  localhost            anywhere             tcp dpt:https
+        DNAT       tcp  --  anywhere             anywhere             tcp dpt:https to:10.233.90.4:8443
+
+
+Istio-test
+----------
+
+cp -r ~/istio-1.9.0/samples/helloworld ~/istio-test
+
+Edit helloworld.yaml --> helloworld-python.yaml
+------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworld
+  labels:
+    app: helloworld
+    service: helloworld
+spec:
+  ports:
+  - port: 8080
+    name: http
+  selector:
+    app: helloworld
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld-python
+  labels:
+    app: helloworld
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld
+  template:
+    metadata:
+      labels:
+        app: helloworld
+    spec:
+      containers:
+      - name: helloworld
+        image: docker.io/paarijaat/helloworld-python
+        resources:
+          requests:
+            cpu: "100m"
+        imagePullPolicy: IfNotPresent #Always
+        env:
+          - name: TARGET
+            value: "Python Sample v1"
+          - name: PORT
+            value: "8080"
+        ports:
+        - containerPort: 8080
+  
+
+istioctl kube-inject -f helloworld-python.yaml > helloworld-python-kube-inject.yaml
+k -n istio-test apply -f helloworld-python-kube-inject.yaml
+
+--- Virtual service def needs to rewrite uri----
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: helloworld-gateway
+spec:
+  selector:
+    istio: ingressgateway # use istio default controller
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "192.168.33.150.xip.io"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: helloworld
+spec:
+  hosts:
+  - "192.168.33.150.xip.io"
+  gateways:
+  - helloworld-gateway
+  http:
+  - match:
+    - uri:
+        exact: /hello
+    rewrite:      # <-- THIS
+      uri: "/"    # <-- THIS
+    route:
+    - destination:
+        host: helloworld.istio-test.svc.cluster.local
+        port:
+          number: 8080
+
+k -n istio-test apply -f helloworld-gateway.yaml
+
+vagrant@node1:~/istio-test$ curl http://192.168.33.150.xip.io/hello
+      Hello Python Sample v1!
+
+vagrant@node1:~/istio-test$ istioctl proxy-config listener istio-ingressgateway-548b8d6c87-6w5g8.istio-system
+      ADDRESS PORT  MATCH DESTINATION
+      0.0.0.0 8080  ALL   Route: http.80
+      0.0.0.0 15021 ALL   Inline Route: /healthz/ready*
+      0.0.0.0 15090 ALL   Inline Route: /stats/prometheus*
+
+
+vagrant@node1:~/istio-test$ istioctl proxy-config route istio-ingressgateway-548b8d6c87-6w5g8.istio-system
+      NOTE: This output only contains routes loaded via RDS.
+      NAME        DOMAINS     MATCH                  VIRTUAL SERVICE
+      http.80     *           /hello                 helloworld.istio-test
+                  *           /stats/prometheus*     
+                  *           /healthz/ready*
+
+
+
+vagrant@node1:~/istio-test$ k -n istio-test get pods -o wide
+      NAME                                READY   STATUS    RESTARTS   AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+      helloworld-python-7d9bf7668-hvkj4   2/2     Running   0          79s   10.233.92.29   node3   <none>           <none>
+vagrant@node1:~/istio-test$ k -n istio-test get svc -o wide
+      NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+      helloworld   ClusterIP   10.233.3.112   <none>        8080/TCP   83s   app=helloworld
+
+
+vagrant@node3:~$ sudo nsenter -t 2286587 -n iptables-legacy -t nat -S -v
+      -P PREROUTING ACCEPT -c 630 37800
+      -P INPUT ACCEPT -c 630 37800
+      -P OUTPUT ACCEPT -c 70 6254
+      -P POSTROUTING ACCEPT -c 70 6254
+      -N ISTIO_INBOUND
+      -N ISTIO_IN_REDIRECT
+      -N ISTIO_OUTPUT
+      -N ISTIO_REDIRECT
+      -A PREROUTING -p tcp -c 630 37800 -j ISTIO_INBOUND
+      -A OUTPUT -p tcp -c 6 360 -j ISTIO_OUTPUT
+      -A ISTIO_INBOUND -p tcp -m tcp --dport 15008 -c 0 0 -j RETURN
+      -A ISTIO_INBOUND -p tcp -m tcp --dport 22 -c 0 0 -j RETURN
+      -A ISTIO_INBOUND -p tcp -m tcp --dport 15090 -c 0 0 -j RETURN
+      -A ISTIO_INBOUND -p tcp -m tcp --dport 15021 -c 630 37800 -j RETURN
+      -A ISTIO_INBOUND -p tcp -m tcp --dport 15020 -c 0 0 -j RETURN
+      -A ISTIO_INBOUND -p tcp -c 0 0 -j ISTIO_IN_REDIRECT
+      -A ISTIO_IN_REDIRECT -p tcp -c 0 0 -j REDIRECT --to-ports 15006
+      -A ISTIO_OUTPUT -s 127.0.0.6/32 -o lo -c 0 0 -j RETURN
+      -A ISTIO_OUTPUT ! -d 127.0.0.1/32 -o lo -m owner --uid-owner 1337 -c 0 0 -j ISTIO_IN_REDIRECT
+      -A ISTIO_OUTPUT -o lo -m owner ! --uid-owner 1337 -c 0 0 -j RETURN
+      -A ISTIO_OUTPUT -m owner --uid-owner 1337 -c 6 360 -j RETURN
+      -A ISTIO_OUTPUT ! -d 127.0.0.1/32 -o lo -m owner --gid-owner 1337 -c 0 0 -j ISTIO_IN_REDIRECT
+      -A ISTIO_OUTPUT -o lo -m owner ! --gid-owner 1337 -c 0 0 -j RETURN
+      -A ISTIO_OUTPUT -m owner --gid-owner 1337 -c 0 0 -j RETURN
+      -A ISTIO_OUTPUT -d 127.0.0.1/32 -c 0 0 -j RETURN
+      -A ISTIO_OUTPUT -c 0 0 -j ISTIO_REDIRECT
+      -A ISTIO_REDIRECT -p tcp -c 0 0 -j REDIRECT --to-ports 15001
+
+vagrant@node3:~$ sudo nsenter -t 2286587 -n iptables-legacy -t nat -L -v --line-numbers
+      Chain PREROUTING (policy ACCEPT 664 packets, 39840 bytes)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1      664 39840 ISTIO_INBOUND  tcp  --  any    any     anywhere             anywhere            
+
+      Chain INPUT (policy ACCEPT 664 packets, 39840 bytes)
+      num   pkts bytes target     prot opt in     out     source               destination         
+
+      Chain OUTPUT (policy ACCEPT 73 packets, 6536 bytes)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        6   360 ISTIO_OUTPUT  tcp  --  any    any     anywhere             anywhere            
+
+      Chain POSTROUTING (policy ACCEPT 73 packets, 6536 bytes)
+      num   pkts bytes target     prot opt in     out     source               destination         
+
+      Chain ISTIO_INBOUND (1 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        0     0 RETURN     tcp  --  any    any     anywhere             anywhere             tcp dpt:15008
+      2        0     0 RETURN     tcp  --  any    any     anywhere             anywhere             tcp dpt:ssh
+      3        0     0 RETURN     tcp  --  any    any     anywhere             anywhere             tcp dpt:15090
+      4      664 39840 RETURN     tcp  --  any    any     anywhere             anywhere             tcp dpt:15021
+      5        0     0 RETURN     tcp  --  any    any     anywhere             anywhere             tcp dpt:15020
+      6        0     0 ISTIO_IN_REDIRECT  tcp  --  any    any     anywhere             anywhere            
+
+      Chain ISTIO_IN_REDIRECT (3 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        0     0 REDIRECT   tcp  --  any    any     anywhere             anywhere             redir ports 15006
+
+      Chain ISTIO_OUTPUT (1 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        0     0 RETURN     all  --  any    lo      127.0.0.6            anywhere            
+      2        0     0 ISTIO_IN_REDIRECT  all  --  any    lo      anywhere            !localhost            owner UID match 1337
+      3        0     0 RETURN     all  --  any    lo      anywhere             anywhere             ! owner UID match 1337
+      4        6   360 RETURN     all  --  any    any     anywhere             anywhere             owner UID match 1337
+      5        0     0 ISTIO_IN_REDIRECT  all  --  any    lo      anywhere            !localhost            owner GID match 1337
+      6        0     0 RETURN     all  --  any    lo      anywhere             anywhere             ! owner GID match 1337
+      7        0     0 RETURN     all  --  any    any     anywhere             anywhere             owner GID match 1337
+      8        0     0 RETURN     all  --  any    any     anywhere             localhost           
+      9        0     0 ISTIO_REDIRECT  all  --  any    any     anywhere             anywhere            
+
+      Chain ISTIO_REDIRECT (1 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        0     0 REDIRECT   tcp  --  any    any     anywhere             anywhere             redir ports 15001
+
+
+
+Install Knative
+---------------------------
+export KNATIVE_VERSION=0.20.0
+mkdir -p knative-${KNATIVE_VERSION}
+cd knative-${KNATIVE_VERSION}
+wget https://github.com/knative/serving/releases/download/v${KNATIVE_VERSION}/serving-crds.yaml -O serving-crds.yaml
+wget https://github.com/knative/serving/releases/download/v${KNATIVE_VERSION}/serving-core.yaml -O serving-core.yaml
+wget https://github.com/knative/net-istio/releases/download/v${KNATIVE_VERSION}/release.yaml -O net-istio.yaml
+wget https://github.com/knative/serving/releases/download/v${KNATIVE_VERSION}/serving-hpa.yaml -O serving-hpa.yaml
+
+Edit serving-core.yaml
+----------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-domain
+  namespace: knative-serving
+  labels:
+    serving.knative.dev/release: "v0.20.0"
+  annotations:
+    knative.dev/example-checksum: "74c3fc6a"
+data:
+  192.168.33.150.xip.io: ""   # <-- THIS   (this should be the loadBalancerIP of istio-ingressgateway)
+  svc.cluster.local: |      # <-- THIS
+    selector:
+      app: secret
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-network
+  namespace: knative-serving
+  labels:
+    serving.knative.dev/release: "v0.20.0"
+  annotations:
+    knative.dev/example-checksum: "eaf5fb3f"
+data:
+  domainTemplate: "{{.Name}}.{{.Domain}}"    # <-- THIS
+  _example: |
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-logging
+  namespace: knative-serving
+  labels:
+    serving.knative.dev/release: "v0.20.0"
+  annotations:
+    knative.dev/example-checksum: "56c59cba"
+data:
+  loglevel.autoscaler: "debug"
+  loglevel.hpaautoscaler: "debug"
+  loglevel.controller: "debug"
+  loglevel.queueproxy: "debug"
+  loglevel.webhook: "debug"
+  loglevel.activator: "debug"
+  loglevel.certcontroller: "debug"
+  loglevel.istiocontroller: "debug"
+  loglevel.nscontroller: "debug"
+  _example: |
+
+
+kubectl -n knative-serving patch cm config-domain --type "json" --patch '[{"op":"add","path":"/data","value":{"192.168.33.150.xip.io": ""}}]'
+
+
+Edit net-istio.yaml
+--------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-istio
+  namespace: knative-serving
+  labels:
+    serving.knative.dev/release: "v0.20.0"
+    networking.knative.dev/ingress-provider: istio
+data:
+  gateway.knative-serving.knative-ingress-gateway: "istio-ingressgateway.istio-system.svc.cluster.local"
+  local-gateway.knative-serving.knative-local-gateway: "istio-ingressgateway.istio-system.svc.cluster.local"
+  _example: |
+
+
+kubectl -n knative-serving patch cm config-istio --type "json" --patch '[{"op":"add","path":"/data/gateway.knative-serving.knative-ingress-gateway","value": "istio-ingressgateway.istio-system.svc.cluster.local"},{"op":"add","path":"/data/local-gateway.knative-serving.cluster-local-gateway","value": "istio-ingressgateway.istio-system.svc.cluster.local"}]'
+
+
+kubectl create ns knative-serving
+kubectl apply -f serving-crds.yaml
+kubectl apply -f serving-core.yaml
+kubectl apply -f net-istio.yaml
+
+wget https://github.com/knative/serving/releases/download/v0.20.0/serving-hpa.yaml
+kubectl apply -f serving-hpa.yaml
+
+
+test knative service: create helloworld-python-ksvc.yaml
+-------------------------------------------------------
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: helloworld-python
+  namespace: knative-test
+spec:
+  template:
+    spec:
+      containers:
+      - name: helloworld
+        image: docker.io/paarijaat/helloworld-python
+        resources:
+          requests:
+            cpu: "100m"
+        imagePullPolicy: IfNotPresent #Always
+        env:
+          - name: TARGET
+            value: "Python Sample v1 Knative"
+        ports:
+        - containerPort: 8080
+
+
+In another shell run [NOT NEEDED, since we are using a loadBalancer IP. Otherwise we will need to do this]
+    sudo kubectl port-forward --address 0.0.0.0 -n istio-system svc/istio-ingressgateway 80:80
+
+Run from the node or a pod:
+curl http://helloworld-python.192.168.33.150.xip.io
+
+-------- Knative (end) -------
+
+
+
+
+
+helm repos
+-----------
+helm repo add stable https://charts.helm.sh/stable
+helm repo update
+
+prometheus
+----------
+https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack#configuration
+
+mkdir prometheus; cd prometheus
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm template prometheus prometheus-community/kube-prometheus-stack --namespace prometheus --output-dir .
+helm template prometheus prometheus-community/kube-prometheus-stack --namespace prometheus --output-dir . --set defaultRules.rules.alertmanager=false --set alertmanager.enabled=false
+
+kubectl create ns prometheus
+helm install prometheus prometheus-community/kube-prometheus-stack --namespace prometheus --set defaultRules.rules.alertmanager=false --set alertmanager.enabled=false
+
+Reload grafana service as a LoadBalancer service. 
+k -n prometheus get svc prometheus-grafana -oyaml > grafana-service.yaml
+Edit the above file for that and apply  again
+    spec:
+      clusterIP: 10.233.53.164
+      ports:
+      - name: service
+        port: 80
+        protocol: TCP
+        targetPort: 3000
+      selector:
+        app.kubernetes.io/instance: prometheus
+        app.kubernetes.io/name: grafana
+      sessionAffinity: None
+      type: LoadBalancer <--  THIS 
+      loadBalancerIP: 192.168.33.152  <-- THIS
+    status:
+      loadBalancer: {}
+or
+
+k apply -f grafana-service.yaml
+Ignore (Warning: kubectl apply should be used on resource created by either kubectl create --save-config or kubectl apply)
+
+    OR use file
+/home/vagrant/prometheus/kube-prometheus-stack/charts/grafana/templates/service.yaml
+
+Now you can access grafana through a load balancer ip, without doing a kubectl port forward
+http://192.168.33.152/
+
+  username: admin
+  password: prom-operator
+
+
+# Make prometheus service LoadBalancer
+
+k -n prometheus get svc prometheus-kube-prometheus-prometheus -oyaml > prometheus-service.yaml
+edit with type: LoadBalancer and loadBalancerIP: 192.168.33.153
+k apply -f prometheus-service.yaml
+
+http://192.168.33.153:9090/
+
+OR you can port forward prometheus service: Port forward localhost:9090 port to prometheus service port 9090:
+kubectl -n prometheus --address 0.0.0.0 port-forward service/prometheus-kube-prometheus-prometheus 9090
+
+Now access prometheus dashboard in browser via:
+http://localhost:9090/
+
+kubectl -n prometheus --address 0.0.0.0 port-forward service/prometheus-grafana 3000:80
+http://localhost:3000/
+
+user: admin
+pass: prom-operator
+
+https://blog.nebrass.fr/playing-with-serverless-in-kubernetes-with-knative/
+https://github.com/iancoffey/knative-metrics/blob/main/manifests/20-prometheus.yaml
+
+
+[NOT TESTED] Enable prometheus for ISTIO
+-----------------------------------------
+https://istio.io/latest/docs/ops/integrations/prometheus/#Configuration
+(the above will have to be translated to ServiceMonitor and PodMonitor)
+https://docs.openshift.com/container-platform/4.4/rest_api/monitoring_apis/podmonitor-monitoring-coreos-com-v1.html
+-------------------------------------------------------------------------------
+
+
+[OPTIONAL, Not tested] Install Kiali
+-----------------------------------
+
+https://kiali.io/documentation/latest/quick-start/#_install_via_kiali_server_helm_chart
+
+helm template \
+  --namespace istio-system \
+  --set auth.strategy="anonymous" \
+  --repo https://kiali.org/helm-charts \
+  --output-dir . \
+  kiali-server \
+  kiali-server
+
+helm install \
+  --namespace istio-system \
+  --set auth.strategy="anonymous" \
+  --repo https://kiali.org/helm-charts \
+  kiali-server \
+  kiali-server
+
+      W0222 15:00:21.020662 2940991 warnings.go:70] networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+      W0222 15:00:21.579924 2940991 warnings.go:70] networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+      NAME: kiali-server
+      LAST DEPLOYED: Mon Feb 22 15:00:20 2021
+      NAMESPACE: istio-system
+      STATUS: deployed
+      REVISION: 1
+      TEST SUITE: None
+      NOTES:
+      Welcome to Kiali! For more details on Kiali, see: https://kiali.io
+
+      The Kiali Server [v1.30.0] has been installed in namespace [istio-system]. It will be ready soon.
+
+      (Helm: Chart=[kiali-server], Release=[kiali-server], Version=[1.30.0])
+------------------------------------------------------------------
+
+
+
+Rabbitmq
+---------
+
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+helm template rabbitmq --set auth.username=rabbituser --set auth.password=rabbitpassword bitnami/rabbitmq --namespace rabbitmq --output-dir .
+k create ns rabbitmq
+helm install rabbitmq --set auth.username=rabbituser --set auth.password=rabbitpassword bitnami/rabbitmq --namespace rabbitmq
+
+      NAME: rabbitmq
+      LAST DEPLOYED: Fri Feb 12 12:59:29 2021
+      NAMESPACE: rabbitmq
+      STATUS: deployed
+      REVISION: 1
+      TEST SUITE: None
+      NOTES:
+      ** Please be patient while the chart is being deployed **
+
+      Credentials:
+
+          echo "Username      : rabbituser"
+          echo "Password      : $(kubectl get secret --namespace rabbitmq rabbitmq -o jsonpath="{.data.rabbitmq-password}" | base64 --decode)"
+          echo "ErLang Cookie : $(kubectl get secret --namespace rabbitmq rabbitmq -o jsonpath="{.data.rabbitmq-erlang-cookie}" | base64 --decode)"
+
+      RabbitMQ can be accessed within the cluster on port  at rabbitmq.rabbitmq.svc.
+
+      To access for outside the cluster, perform the following steps:
+
+      To Access the RabbitMQ AMQP port:
+
+          echo "URL : amqp://127.0.0.1:5672/"
+          kubectl port-forward --namespace rabbitmq svc/rabbitmq 5672:5672
+
+      To Access the RabbitMQ Management interface:
+
+          echo "URL : http://127.0.0.1:15672/"
+          kubectl port-forward --namespace rabbitmq svc/rabbitmq 15672:15672
+
+Edit deploy/deploy-consumer.yaml
+----------------------------------
+(change namespace to rabbitmq)
+
+kind: Secret
+metadata:
+  namespace: rabbitmq     <-- THIS
+  name: rabbitmq-consumer-secret
+data:
+  RabbitMqHost: YW1xcDovL3JhYmJpdHVzZXI6cmFiYml0cGFzc3dvcmRAcmFiYml0bXEucmFiYml0bXEuc3ZjLmNsdXN0ZXIubG9jYWw6NTY3Mg==  <-- THIS
+---
+
+      To poduce the above string:
+
+      echo -n 'amqp://rabbituser:rabbitpassword@rabbitmq.rabbitmq.svc.cluster.local:5672' | base64  --wrap=0
+      YW1xcDovL3JhYmJpdHVzZXI6cmFiYml0cGFzc3dvcmRAcmFiYml0bXEucmFiYml0bXEuc3ZjLmNsdXN0ZXIubG9jYWw6NTY3Mg==
+
+      echo -n "YW1xcDovL3JhYmJpdHVzZXI6cmFiYml0cGFzc3dvcmRAcmFiYml0bXEucmFiYml0bXEuc3ZjLmNsdXN0ZXIubG9jYWw6NTY3Mg==" | base64 --decode
+      amqp://rabbituser:rabbitpassword@rabbitmq.rabbitmq.svc.cluster.local:5672(no-newline)
+
+kind: Deployment
+metadata:
+  name: rabbitmq-consumer
+  namespace: rabbitmq   <--THIS
+spec:
+  template:
+    spec:
+      containers:
+        - name: rabbitmq-consumer
+          ..
+          args:
+            - "amqp://rabbituser:rabbitpassword@rabbitmq.rabbitmq.svc.cluster.local:5672"   <--THIS
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: rabbitmq-consumer
+  namespace: rabbitmq     <--THIS
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-consumer-trigger
+  namespace: rabbitmq   <--THIS
+
+
+k apply -f deploy/deploy-consumer.yaml
+
+edit deploy/deploy-publisher-job.yaml:
+  change namespace to rabbitmq
+  command: ["send",  "amqp://rabbituser:rabbitpassword@rabbitmq.rabbitmq.svc.cluster.local:5672", "300"]
+
+k apply -f deploy/deploy-publisher-job.yaml
+
+You should now see lots of pods being created
+-----------------------------------------------------
+
+
+redis
+-----
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+helm template redis-server --set cluster.enabled=false --set usePassword=false bitnami/redis --namespace redis --output-dir .
+kubectl create ns redis
+helm install redis-server --set cluster.enabled=false --set usePassword=false bitnami/redis --namespace redis
+
+  output:
+      NAME: redis-server
+      LAST DEPLOYED: Fri Feb  5 11:56:17 2021
+      NAMESPACE: redis
+      STATUS: deployed
+      REVISION: 1
+      TEST SUITE: None
+      NOTES:
+      ** Please be patient while the chart is being deployed **
+      Redis(TM) can be accessed via port 6379 on the following DNS name from within your cluster:
+
+      redis-server-master.redis.svc.cluster.local
+
+
+
+      To connect to your Redis(TM) server:
+
+      1. Run a Redis(TM) pod that you can use as a client:
+         kubectl run --namespace redis redis-server-client --rm --tty -i --restart='Never' \
+         
+         --image docker.io/bitnami/redis:6.0.10-debian-10-r1 -- bash
+
+      2. Connect using the Redis(TM) CLI:
+         redis-cli -h redis-server-master
+
+      To connect to your database from outside the cluster execute the following commands:
+
+          kubectl port-forward --namespace redis svc/redis-server-master 6379:6379 &
+          redis-cli -h 127.0.0.1 -p 6379
+---------------------------------------------------------
+
+
+keda-test
+---------
+https://itnext.io/tutorial-auto-scale-your-kubernetes-apps-with-prometheus-and-keda-c6ea460e4642
+
+git clone https://github.com/abhirockzz/kubernetes-keda-prometheus.git
+update kubernetes-keda-prometheus/main.go for asyn request handling  (see at the bottom for the go code)
+docker build -t go-prom-app .
+docker tag go-prom-app:latest localhost:5000/go-prom-app:latest
+docker push localhost:5000/go-prom-app:latest
+curl localhost:5000/v2/_catalog
+  {"repositories":["go-prom-app"]}
+
+edit go-app.yaml:
+
+Deployment:   (DNS is not working for registry.kube-system.svc.cluster.local)
+image: localhost:5000/go-prom-app  
+env:
+          - name: REDIS_HOST
+            value: redis-server-master.redis.svc.cluster.local
+Service:
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 192.168.33.154
+
+
+contents of go-app.yaml
+----------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: keda-test                    #<-- THIS
+  name: go-prom-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-prom-app
+  template:
+    metadata:
+      labels:
+        app: go-prom-app
+    spec:
+      containers:
+      - name: go-prom-app
+        image: registry.kube-system.svc.cluster.local:5000/go-prom-app   #<--THIS
+        env:
+          - name: REDIS_HOST
+            value: redis-server-master.redis.svc.cluster.local     #<--THIS
+          - name: REDIS_PORT
+            value: "6379"
+        imagePullPolicy: Always
+        ports:
+            - containerPort: 8080
+              name: metrics          #<--THIS
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-prom-app-service
+  namespace: keda-test                    #<-- THIS
+  labels:
+    app: go-prom-app                #<--THIS
+spec:
+  type: LoadBalancer                #<--THIS
+  loadBalancerIP: 192.168.33.154    #<--THIS
+  ports:
+  - port: 8080
+    name: metrics                   #<--THIS
+    protocol: TCP                   #<--THIS
+    targetPort: 8080                #<--THIS
+  selector:
+    app: go-prom-app
+
+k create ns keda-test
+k -n keda-test apply -f go-app.yaml
+
+http://192.168.33.154:8080/synctest
+http://192.168.33.154:8080/asynctest
+http://192.168.33.154:8080/metrics
+async_http_requests metric
+sync_http_requests metric
+
+see the redis value (deprecated)
+kubectl -n redis exec -it redis-server-master-0 -- redis-cli get access_count
+
+
+ServiceMonitor for the go-app
+
+https://docs.openshift.com/container-platform/4.5/rest_api/monitoring_apis/servicemonitor-monitoring-coreos-com-v1.html
+https://github.com/prometheus-operator/prometheus-operator/issues/2515
+
+create go-app-servicemonitor.yaml
+---------------------------------
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keda-test-go-app-servicemonitor
+  # Change this to the namespace the Prometheus instance is running in
+  namespace: prometheus
+  labels:
+    app: keda-test-go-app-servicemonitor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: go-prom-app
+  namespaceSelector:
+    matchNames:
+    - keda-test
+  endpoints:
+  - port: metrics
+    interval: 5s
+
+
+Doing the above
+http://192.168.33.153:9090/targets  should now contain keda-test
+http://192.168.33.153:9090/service-discovery  should now contain keda-test
+
+
+Doing the above will insert the following in the 'scrape_config' section in prometheus config (use prometheus UI to view config: http://192.168.33.153:9090/)
+      scrape_configs:
+      - job_name: prometheus/keda-test-go-app-servicemonitor/0
+        honor_timestamps: true
+        scrape_interval: 5s
+        scrape_timeout: 5s
+        metrics_path: /metrics
+        scheme: http
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_service_label_app]
+          separator: ;
+          regex: go-prom-app
+          replacement: $1
+          action: keep
+        - source_labels: [__meta_kubernetes_endpoint_port_name]
+          separator: ;
+          regex: metrics
+          replacement: $1
+          action: keep
+        - source_labels: [__meta_kubernetes_endpoint_address_target_kind, __meta_kubernetes_endpoint_address_target_name]
+          separator: ;
+          regex: Node;(.*)
+          target_label: node
+          replacement: ${1}
+          action: replace
+        - source_labels: [__meta_kubernetes_endpoint_address_target_kind, __meta_kubernetes_endpoint_address_target_name]
+          separator: ;
+          regex: Pod;(.*)
+          target_label: pod
+          replacement: ${1}
+          action: replace
+        - source_labels: [__meta_kubernetes_namespace]
+          separator: ;
+          regex: (.*)
+          target_label: namespace
+          replacement: $1
+          action: replace
+        - source_labels: [__meta_kubernetes_service_name]
+          separator: ;
+          regex: (.*)
+          target_label: service
+          replacement: $1
+          action: replace
+        - source_labels: [__meta_kubernetes_pod_name]
+          separator: ;
+          regex: (.*)
+          target_label: pod
+          replacement: $1
+          action: replace
+        - source_labels: [__meta_kubernetes_pod_container_name]
+          separator: ;
+          regex: (.*)
+          target_label: container
+          replacement: $1
+          action: replace
+        - source_labels: [__meta_kubernetes_service_name]
+          separator: ;
+          regex: (.*)
+          target_label: job
+          replacement: ${1}
+          action: replace
+        - separator: ;
+          regex: (.*)
+          target_label: endpoint
+          replacement: metrics
+          action: replace
+        - source_labels: [__address__]
+          separator: ;
+          regex: (.*)
+          modulus: 1
+          target_label: __tmp_hash
+          replacement: $1
+          action: hashmod
+        - source_labels: [__tmp_hash]
+          separator: ;
+          regex: "0"
+          replacement: $1
+          action: keep
+        kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names:
+            - keda-test
+
+
+Port forward localhost:9090 port to prometheus service port 9090:
+kubectl -n prometheus port-forward service/prometheus-kube-prometheus-prometheus 9090
+
+Now access prometheus dashboard in browser via:
+http://localhost:9090/
+
+    You should see on prometheus dashboard (in about a min)
+    in Service Discovery
+      prometheus/keda-test-go-app-servicemonitor/0 (1 / 1 active targets)
+    in Targets
+      prometheus/keda-test-go-app-servicemonitor/0 (1/1 up)
+
+Generate load:
+curl -o hey https://hey-release.s3.us-east-2.amazonaws.com/hey_linux_amd64 && chmod a+x hey
+
+./hey -disable-keepalive -c 20 -q 1 -n 4000 http://192.168.33.154:8080/asynctest
+
+rate(async_http_requests[10s])  in grafana or prometheus UI
+rate(sync_http_requests[10s])
+async_http_requests-async_finish_http_requests
+
+OR
+
+
+          vagrant@node1:~/keda-test$ ./hey -disable-keepalive -c 20 -q 1 -n 4000 http://192.168.33.154:8080/asynctest
+
+          Summary:
+            Total:        200.6356 secs
+            Slowest:      0.7053 secs
+            Fastest:      0.0006 secs
+            Average:      0.0202 secs
+            Requests/sec: 19.9366
+            
+            Total data:   391572 bytes
+            Size/request: 97 bytes
+
+          Response time histogram:
+            0.001 [1]     |
+            0.071 [3845]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+            0.142 [127]   |■
+            0.212 [13]    |
+            0.283 [9]     |
+            0.353 [0]     |
+            0.423 [0]     |
+            0.494 [2]     |
+            0.564 [0]     |
+            0.635 [1]     |
+            0.705 [2]     |
+
+
+          Latency distribution:
+            10% in 0.0042 secs
+            25% in 0.0067 secs
+            50% in 0.0118 secs
+            75% in 0.0219 secs
+            90% in 0.0430 secs
+            95% in 0.0641 secs
+            99% in 0.1203 secs
+
+          Details (average, fastest, slowest):
+            DNS+dialup:   0.0065 secs, 0.0006 secs, 0.7053 secs
+            DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
+            req write:    0.0011 secs, 0.0000 secs, 0.0301 secs
+            resp wait:    0.0120 secs, 0.0001 secs, 0.6218 secs
+            resp read:    0.0005 secs, 0.0000 secs, 0.0624 secs
+
+          Status code distribution:
+            [200] 4000 responses
+
+
+http://192.168.33.153:9090/graph?g0.expr=rate(async_http_requests%5B10s%5D)&g0.tab=0&g0.stacked=0&g0.range_input=10m&g0.end_input=2021-02-11%2013%3A04%3A00&g0.moment_input=2021-02-11%2013%3A04%3A00&g1.expr=rate(async_finish_http_requests%5B10s%5D)&g1.tab=0&g1.stacked=0&g1.range_input=10m&g1.end_input=2021-02-11%2013%3A04%3A00&g1.moment_input=2021-02-11%2013%3A04%3A00&g2.expr=async_http_requests-async_finish_http_requests&g2.tab=0&g2.stacked=1&g2.range_input=10m&g2.end_input=2021-02-11%2013%3A04%3A00&g2.moment_input=2021-02-11%2013%3A04%3A00&g3.expr=sum(async_http_requests)-sum(async_finish_http_requests)&g3.tab=0&g3.stacked=1&g3.range_input=10m&g3.end_input=2021-02-11%2013%3A04%3A00&g3.moment_input=2021-02-11%2013%3A04%3A00&g4.expr=async_http_requests&g4.tab=0&g4.stacked=1&g4.range_input=10m&g4.end_input=2021-02-11%2013%3A04%3A00&g4.moment_input=2021-02-11%2013%3A04%3A00
+
+2021-02-11 14:04:00 (end)  10m windows
+
+
+With Full 10 replias already running
+
+
+k -n keda-test scale deploy go-prom-app --replicas=10
+
+          vagrant@node1:~/keda-test$ ./hey -disable-keepalive -c 20 -q 1 -n 4000 http://192.168.33.154:8080/asynctest
+
+          Summary:
+            Total:        200.1455 secs
+            Slowest:      0.4811 secs
+            Fastest:      0.0007 secs
+            Average:      0.0313 secs
+            Requests/sec: 19.9855
+            
+            Total data:   392361 bytes
+            Size/request: 98 bytes
+
+          Response time histogram:
+            0.001 [1]     |
+            0.049 [3283]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+            0.097 [432]   |■■■■■
+            0.145 [184]   |■■
+            0.193 [70]    |■
+            0.241 [15]    |
+            0.289 [9]     |
+            0.337 [4]     |
+            0.385 [0]     |
+            0.433 [0]     |
+            0.481 [2]     |
+
+
+          Latency distribution:
+            10% in 0.0052 secs
+            25% in 0.0087 secs
+            50% in 0.0165 secs
+            75% in 0.0350 secs
+            90% in 0.0770 secs
+            95% in 0.1183 secs
+            99% in 0.1820 secs
+
+          Details (average, fastest, slowest):
+            DNS+dialup:   0.0102 secs, 0.0007 secs, 0.4811 secs
+            DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
+            req write:    0.0018 secs, 0.0000 secs, 0.1317 secs
+            resp wait:    0.0185 secs, 0.0002 secs, 0.4693 secs
+            resp read:    0.0007 secs, 0.0000 secs, 0.1695 secs
+
+          Status code distribution:
+            [200] 4000 responses
+
+http://192.168.33.153:9090/graph?g0.expr=rate(async_http_requests%5B10s%5D)&g0.tab=0&g0.stacked=0&g0.range_input=10m&g0.end_input=2021-02-11%2015%3A32%3A00&g0.moment_input=2021-02-11%2015%3A32%3A00&g1.expr=rate(async_finish_http_requests%5B10s%5D)&g1.tab=0&g1.stacked=0&g1.range_input=10m&g1.end_input=2021-02-11%2015%3A32%3A00&g1.moment_input=2021-02-11%2015%3A32%3A00&g2.expr=async_http_requests-async_finish_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=10m&g2.end_input=2021-02-11%2015%3A32%3A00&g2.moment_input=2021-02-11%2015%3A32%3A00&g3.expr=sum(async_http_requests)-sum(async_finish_http_requests)&g3.tab=0&g3.stacked=1&g3.range_input=10m&g3.end_input=2021-02-11%2015%3A32%3A00&g3.moment_input=2021-02-11%2015%3A32%3A00&g4.expr=async_http_requests&g4.tab=0&g4.stacked=1&g4.range_input=10m&g4.end_input=2021-02-11%2015%3A32%3A00&g4.moment_input=2021-02-11%2015%3A32%3A00
+
+
+
+./hey -disable-keepalive -c 20 -q 1 -n 4000 "http://192.168.33.154:8080/asynctest?sleep=300&prime=100000&bloat=10"
+
+
+./hey -disable-keepalive -c 50 -q 50 -n 20000 "http://192.168.33.154:8080/asynctest?sleep=300&prime=100000&bloat=10"
+
+http://192.168.33.153:9090/graph?g0.expr=rate(async_http_requests%5B5s%5D)&g0.tab=0&g0.stacked=1&g0.range_input=5m&g0.end_input=2021-02-12%2011%3A35%3A02&g0.moment_input=2021-02-12%2011%3A35%3A02&g1.expr=rate(async_finish_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=5m&g1.end_input=2021-02-12%2011%3A35%3A02&g1.moment_input=2021-02-12%2011%3A35%3A02&g2.expr=async_http_requests-async_finish_http_requests&g2.tab=0&g2.stacked=1&g2.range_input=5m&g2.end_input=2021-02-12%2011%3A35%3A02&g2.moment_input=2021-02-12%2011%3A35%3A02&g3.expr=avg(async_http_requests-async_finish_http_requests)&g3.tab=0&g3.stacked=1&g3.range_input=5m&g3.end_input=2021-02-12%2011%3A35%3A02&g3.moment_input=2021-02-12%2011%3A35%3A02&g4.expr=async_http_requests&g4.tab=0&g4.stacked=1&g4.range_input=5m&g4.end_input=2021-02-12%2011%3A35%3A02&g4.moment_input=2021-02-12%2011%3A35%3A02&g5.expr=async_finish_http_requests&g5.tab=0&g5.stacked=1&g5.range_input=5m&g5.end_input=2021-02-12%2011%3A35%3A02&g5.moment_input=2021-02-12%2011%3A35%3A02
+
+
+
+./hey -disable-keepalive -c 50 -q 2 -n 20000 "http://192.168.33.154:8080/asynctest?sleep=300&prime=1000000&bloat=5"
+
+
+hey -disable-keepalive -c 50 -q 2 -n 20000 "http://192.168.33.154:8080/asynctest?sleep=300&prime=1000000&bloat=5"
+http://192.168.33.153:9090/graph?g0.expr=rate(async_http_requests%5B10s%5D)&g0.tab=0&g0.stacked=1&g0.range_input=15m&g0.end_input=2021-02-12%2012%3A51%3A29&g0.moment_input=2021-02-12%2012%3A51%3A29&g1.expr=rate(async_finish_http_requests%5B10s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=15m&g1.end_input=2021-02-12%2012%3A51%3A29&g1.moment_input=2021-02-12%2012%3A51%3A29&g2.expr=async_http_requests-async_finish_http_requests&g2.tab=0&g2.stacked=1&g2.range_input=15m&g2.end_input=2021-02-12%2012%3A51%3A29&g2.moment_input=2021-02-12%2012%3A51%3A29&g3.expr=avg(async_http_requests-async_finish_http_requests)&g3.tab=0&g3.stacked=1&g3.range_input=15m&g3.end_input=2021-02-12%2012%3A51%3A29&g3.moment_input=2021-02-12%2012%3A51%3A29&g4.expr=async_http_requests&g4.tab=0&g4.stacked=1&g4.range_input=15m&g4.end_input=2021-02-12%2012%3A51%3A29&g4.moment_input=2021-02-12%2012%3A51%3A29&g5.expr=async_finish_http_requests&g5.tab=0&g5.stacked=1&g5.range_input=15m&g5.end_input=2021-02-12%2012%3A51%3A29&g5.moment_input=2021-02-12%2012%3A51%3A29
+
+
+
+./hey -disable-keepalive -c 3 -q 1 -n 4000 "http://192.168.33.154:8080/synctest?sleep=10&prime=100000000&bloat=1"
+
+
+https://www.burlutsky.su/monitoring/prometheus-custom-servicemonitor/
+
+
+Keda
+-----
+
+https://keda.sh/docs/2.1/deploy/
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+kubectl create namespace keda
+helm template keda kedacore/keda --namespace keda --output-dir .
+helm install keda kedacore/keda --namespace keda
+
+Keda ScaledObject to handle go-app:
+
+create keda-test/kubernetes-keda-prometheus/keda2-prometheus-scaledobject.yaml
+------------------------------------------------------------------------------
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: prometheus-scaledobject
+  namespace: keda-test       # Same as the deployment namespace
+  labels:
+    deploymentName: go-prom-app
+spec:
+  scaleTargetRef:
+    name:          go-prom-app         # Mandatory. Must be in the same namespace as the ScaledObject
+  pollingInterval: 5                                # Optional. Default: 30 seconds
+  cooldownPeriod:  300                               # Optional. Default: 300 seconds
+  minReplicaCount: 0                                 # Optional. Default: 0
+  maxReplicaCount: 10                               # Optional. Default: 100
+  triggers:
+  - type: prometheus
+    metadata:
+      # Required
+      serverAddress: http://prometheus-kube-prometheus-prometheus.prometheus.svc.cluster.local:9090
+      metricName: async_access_frequency
+      threshold: '10'
+      query: sum(async_http_requests)-sum(async_finish_http_requests)
+
+
+https://keda.sh/docs/2.0/concepts/scaling-deployments/
+
+
+
+Knative request-per-second
+--------------------------
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: go-prom-app-ksvc
+  namespace: keda-test
+spec:
+  template:
+    metadata:
+      annotations:
+        # autoscaling.knative.dev/class: "hpa.autoscaling.knative.dev"
+        autoscaling.knative.dev/metric: "rps"
+        autoscaling.knative.dev/target: "10"
+        autoscaling.knative.dev/targetUtilizationPercentage: "70"
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/scaleDownDelay: "1m"
+    spec:
+      containers:
+      - name: go-prom-app
+        image: registry.kube-system.svc.cluster.local:5000/go-prom-app
+        resources:
+          requests:
+            cpu: "50m"
+          limits:
+            cpu: "200m"
+        env:
+          - name: REDIS_HOST
+            value: redis-server-master.redis.svc.cluster.local
+          - name: REDIS_PORT
+            value: "6379"
+        imagePullPolicy: Always
+        ports:
+          - containerPort: 8080
+            name: http1
+
+
+vagrant@node1:~/keda-test$ hey -disable-keepalive -c 20 -q 1 -n 4000 "http://go-prom-app-ksvc.192.168.33.150.xip.io/synctest?sleep=300&prime=100000&bloat=10"
+
+Summary:
+  Total:        201.4267 secs
+  Slowest:      2.2356 secs
+  Fastest:      0.3149 secs
+  Average:      0.4916 secs
+  Requests/sec: 19.8583
+
+  Total data:   477690 bytes
+  Size/request: 119 bytes
+
+Response time histogram:
+  0.315 [1]     |
+  0.507 [2548]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.699 [1221]  |■■■■■■■■■■■■■■■■■■■
+  0.891 [166]   |■■■
+  1.083 [24]    |
+  1.275 [10]    |
+  1.467 [5]     |
+  1.659 [3]     |
+  1.851 [9]     |
+  2.043 [10]    |
+  2.236 [3]     |
+
+
+Latency distribution:
+  10% in 0.3674 secs
+  25% in 0.3969 secs
+  50% in 0.4533 secs
+  75% in 0.5355 secs
+  90% in 0.6277 secs
+  95% in 0.7132 secs
+  99% in 1.0843 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0200 secs, 0.3149 secs, 2.2356 secs
+  DNS-lookup:   0.0116 secs, 0.0003 secs, 0.2129 secs
+  req write:    0.0022 secs, 0.0000 secs, 0.0616 secs
+  resp wait:    0.4690 secs, 0.3097 secs, 2.2218 secs
+  resp read:    0.0003 secs, 0.0000 secs, 0.0332 secs
+
+Status code distribution:
+  [200] 4000 responses
+
+
+
+vagrant@node1:~/keda-test$ hey -disable-keepalive -c 20 -q 1 -n 4000 "http://go-prom-app-ksvc.192.168.33.150.xip.io/asynctest?sleep=300&prime=100000&bloat=10"
+
+Summary:
+  Total:        200.1990 secs
+  Slowest:      0.9482 secs
+  Fastest:      0.0188 secs
+  Average:      0.1235 secs
+  Requests/sec: 19.9801
+
+  Total data:   477910 bytes
+  Size/request: 119 bytes
+
+Response time histogram:
+  0.019 [1]     |
+  0.112 [2120]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.205 [1514]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.298 [283]   |■■■■■
+  0.391 [40]    |■
+  0.484 [16]    |
+  0.576 [12]    |
+  0.669 [7]     |
+  0.762 [4]     |
+  0.855 [1]     |
+  0.948 [2]     |
+
+
+Latency distribution:
+  10% in 0.0575 secs
+  25% in 0.0785 secs
+  50% in 0.1085 secs
+  75% in 0.1482 secs
+  90% in 0.1973 secs
+  95% in 0.2405 secs
+  99% in 0.4273 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0160 secs, 0.0188 secs, 0.9482 secs
+  DNS-lookup:   0.0103 secs, 0.0001 secs, 0.2121 secs
+  req write:    0.0013 secs, 0.0000 secs, 0.0652 secs
+  resp wait:    0.1059 secs, 0.0118 secs, 0.7379 secs
+  resp read:    0.0003 secs, 0.0000 secs, 0.0240 secs
+
+Status code distribution:
+  [200] 4000 responses
+
+
+
+Keda requests per second
+------------------------
+20 req per sec
+---------
+vagrant@node1:~/keda$ hey -disable-keepalive -c 20 -q 1 -n 4000 "http://192.168.33.154:8080/asynctest?sleep=300&prime=100000&bloat=10"
+
+Summary:
+  Total:        200.1095 secs
+  Slowest:      0.5307 secs
+  Fastest:      0.0011 secs
+  Average:      0.0430 secs
+  Requests/sec: 19.9891
+
+  Total data:   383171 bytes
+  Size/request: 95 bytes
+
+Response time histogram:
+  0.001 [1]     |
+  0.054 [3021]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.107 [815]   |■■■■■■■■■■■
+  0.160 [113]   |■
+  0.213 [28]    |
+  0.266 [8]     |
+  0.319 [8]     |
+  0.372 [4]     |
+  0.425 [0]     |
+  0.478 [1]     |
+  0.531 [1]     |
+
+
+Latency distribution:
+  10% in 0.0120 secs
+  25% in 0.0217 secs
+  50% in 0.0359 secs
+  75% in 0.0536 secs
+  90% in 0.0788 secs
+  95% in 0.0995 secs
+  99% in 0.1720 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0091 secs, 0.0011 secs, 0.5307 secs
+  DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
+  req write:    0.0026 secs, 0.0000 secs, 0.0702 secs
+  resp wait:    0.0303 secs, 0.0003 secs, 0.5072 secs
+  resp read:    0.0009 secs, 0.0000 secs, 0.0372 secs
+
+Status code distribution:
+  [200] 4000 responses
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=4m&g0.end_input=2021-02-24%2011%3A27%3A00&g0.moment_input=2021-02-24%2011%3A27%3A00&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=4m&g1.end_input=2021-02-24%2011%3A27%3A00&g1.moment_input=2021-02-24%2011%3A27%3A00&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=4m&g2.end_input=2021-02-24%2011%3A27%3A00&g2.moment_input=2021-02-24%2011%3A27%3A00
+
+
+40 req per sec
+------------
+vagrant@node1:~/keda$ hey -disable-keepalive -c 20 -q 2 -n 4000 "http://192.168.33.154:8080/asynctest?sleep=300&prime=100000&bloat=10"
+
+
+Summary:
+  Total:        100.0862 secs
+  Slowest:      0.6209 secs
+  Fastest:      0.0007 secs
+  Average:      0.0589 secs
+  Requests/sec: 39.9656
+
+  Total data:   381975 bytes
+  Size/request: 95 bytes
+
+Response time histogram:
+  0.001 [1]     |
+  0.063 [2765]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.125 [821]   |■■■■■■■■■■■■
+  0.187 [242]   |■■■■
+  0.249 [63]    |■
+  0.311 [63]    |■
+  0.373 [32]    |
+  0.435 [2]     |
+  0.497 [6]     |
+  0.559 [2]     |
+  0.621 [3]     |
+
+
+Latency distribution:
+  10% in 0.0114 secs
+  25% in 0.0208 secs
+  50% in 0.0413 secs
+  75% in 0.0700 secs
+  90% in 0.1259 secs
+  95% in 0.1758 secs
+  99% in 0.3215 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0109 secs, 0.0007 secs, 0.6209 secs
+  DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
+  req write:    0.0023 secs, 0.0000 secs, 0.1060 secs
+  resp wait:    0.0446 secs, 0.0004 secs, 0.5956 secs
+  resp read:    0.0010 secs, 0.0000 secs, 0.0713 secs
+
+Status code distribution:
+  [200] 4000 responses
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=4m&g0.end_input=2021-02-24%2011%3A46%3A00&g0.moment_input=2021-02-24%2011%3A46%3A00&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=4m&g1.end_input=2021-02-24%2011%3A46%3A00&g1.moment_input=2021-02-24%2011%3A46%3A00&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=4m&g2.end_input=2021-02-24%2011%3A46%3A00&g2.moment_input=2021-02-24%2011%3A46%3A00
+
+
+
+80 req per sec
+-------------
+vagrant@node1:~/keda$ hey -disable-keepalive -c 40 -q 2 -n 4000 "http://192.168.33.154:8080/asynctest?sleep=300&prime=100000&bloat=10"
+
+Summary:
+  Total:        50.6623 secs
+  Slowest:      1.2903 secs
+  Fastest:      0.0009 secs
+  Average:      0.1603 secs
+  Requests/sec: 78.9542
+
+  Total data:   380620 bytes
+  Size/request: 95 bytes
+
+Response time histogram:
+  0.001 [1]     |
+  0.130 [2304]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.259 [953]   |■■■■■■■■■■■■■■■■■
+  0.388 [402]   |■■■■■■■
+  0.517 [176]   |■■■
+  0.646 [104]   |■■
+  0.775 [36]    |■
+  0.903 [11]    |
+  1.032 [6]     |
+  1.161 [4]     |
+  1.290 [3]     |
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=4m&g0.end_input=2021-02-24%2012%3A00%3A30&g0.moment_input=2021-02-24%2012%3A00%3A30&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=4m&g1.end_input=2021-02-24%2012%3A00%3A30&g1.moment_input=2021-02-24%2012%3A00%3A30&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=4m&g2.end_input=2021-02-24%2012%3A00%3A30&g2.moment_input=2021-02-24%2012%3A00%3A30&g3.expr=async_finish_http_requests&g3.tab=0&g3.stacked=0&g3.range_input=4m&g3.end_input=2021-02-24%2012%3A00%3A30&g3.moment_input=2021-02-24%2012%3A00%3A30
+
+
+
+Low request rate, CPU heavy
+---------------------------
+vagrant@node1:~$ hey -disable-keepalive -c 4 -q 1 -n 1000 "http://192.168.33.154:8080/asynctest?sleep=500&prime=10000000&bloat=60"
+
+
+Summary:
+  Total:        250.0278 secs
+  Slowest:      0.9751 secs
+  Fastest:      0.0006 secs
+  Average:      0.0318 secs
+  Requests/sec: 3.9996
+
+  Total data:   95259 bytes
+  Size/request: 95 bytes
+
+Response time histogram:
+  0.001 [1]     |
+  0.098 [951]   |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.195 [20]    |■
+  0.293 [12]    |■
+  0.390 [4]     |
+  0.488 [5]     |
+  0.585 [1]     |
+  0.683 [3]     |
+  0.780 [0]     |
+  0.878 [0]     |
+  0.975 [1]     |
+
+
+Latency distribution:
+  10% in 0.0027 secs
+  25% in 0.0056 secs
+  50% in 0.0146 secs
+  75% in 0.0325 secs
+  90% in 0.0645 secs
+  95% in 0.0932 secs
+  99% in 0.4519 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0054 secs, 0.0006 secs, 0.9751 secs
+  DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
+  req write:    0.0003 secs, 0.0000 secs, 0.0326 secs
+  resp wait:    0.0255 secs, 0.0002 secs, 0.9741 secs
+  resp read:    0.0005 secs, 0.0000 secs, 0.0854 secs
+
+Status code distribution:
+  [200] 998 responses
+
+Error distribution:
+  [2]   Get "http://192.168.33.154:8080/asynctest?sleep=500&prime=10000000&bloat=60": dial tcp 192.168.33.154:8080: connect: connection refused
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=5m&g0.end_input=2021-02-24%2014%3A25%3A32&g0.moment_input=2021-02-24%2014%3A25%3A32&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=5m&g1.end_input=2021-02-24%2014%3A25%3A32&g1.moment_input=2021-02-24%2014%3A25%3A32&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=5m&g2.end_input=2021-02-24%2014%3A25%3A32&g2.moment_input=2021-02-24%2014%3A25%3A32&g3.expr=async_finish_http_requests&g3.tab=0&g3.stacked=0&g3.range_input=5m&g3.end_input=2021-02-24%2014%3A25%3A32&g3.moment_input=2021-02-24%2014%3A25%3A32
+
+
+
+Sync execution
+--------------
+
+vagrant@node1:~/keda$ hey -disable-keepalive -c 20 -q 1 -n 4000 "http://192.168.33.154:8080/synctest?sleep=300&prime=100000&bloat=10"
+
+Summary:
+  Total:        200.3616 secs
+  Slowest:      0.8902 secs
+  Fastest:      0.3029 secs
+  Average:      0.3555 secs
+  Requests/sec: 19.9639
+
+  Total data:   382680 bytes
+  Size/request: 95 bytes
+
+Response time histogram:
+  0.303 [1]     |
+  0.362 [2862]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.420 [844]   |■■■■■■■■■■■■
+  0.479 [152]   |■■
+  0.538 [78]    |■
+  0.597 [33]    |
+  0.655 [9]     |
+  0.714 [5]     |
+  0.773 [5]     |
+  0.831 [4]     |
+  0.890 [7]     |
+
+
+Latency distribution:
+  10% in 0.3161 secs
+  25% in 0.3255 secs
+  50% in 0.3418 secs
+  75% in 0.3658 secs
+  90% in 0.4002 secs
+  95% in 0.4471 secs
+  99% in 0.5659 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0066 secs, 0.3029 secs, 0.8902 secs
+  DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
+  req write:    0.0019 secs, 0.0000 secs, 0.0808 secs
+  resp wait:    0.3465 secs, 0.3006 secs, 0.8850 secs
+  resp read:    0.0003 secs, 0.0000 secs, 0.0217 secs
+
+Status code distribution:
+  [200] 4000 responses
+
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(sync_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=5m&g0.end_input=2021-02-24%2016%3A45%3A38&g0.moment_input=2021-02-24%2016%3A45%3A38&g1.expr=rate(sync_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=5m&g1.end_input=2021-02-24%2016%3A45%3A38&g1.moment_input=2021-02-24%2016%3A45%3A38&g2.expr=sync_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=5m&g2.end_input=2021-02-24%2016%3A45%3A38&g2.moment_input=2021-02-24%2016%3A45%3A38
+
+
+
+Queue based monitoring
+----------------------
+
+Only queue scaler
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=5m&g0.end_input=2021-02-24%2023%3A26%3A00&g0.moment_input=2021-02-24%2023%3A26%3A00&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=5m&g1.end_input=2021-02-24%2023%3A26%3A00&g1.moment_input=2021-02-24%2023%3A26%3A00&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=5m&g2.end_input=2021-02-24%2023%3A26%3A00&g2.moment_input=2021-02-24%2023%3A26%3A00&g3.expr=async_finish_http_requests&g3.tab=0&g3.stacked=0&g3.range_input=5m&g3.end_input=2021-02-24%2023%3A26%3A00&g3.moment_input=2021-02-24%2023%3A26%3A00
+
+
+vagrant@node1:~/rabbitmq-keda/sample-go-rabbitmq/deploy$ k apply -f deploy-consumer.yaml
+vagrant@node1:~/rabbitmq-keda/sample-go-rabbitmq/deploy$ k apply -f deploy-publisher-job.yaml
+
+First scaling happens due to cpu and the second scaling due to queue
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=5m&g0.end_input=2021-02-24%2023%3A45%3A00&g0.moment_input=2021-02-24%2023%3A45%3A00&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=5m&g1.end_input=2021-02-24%2023%3A45%3A00&g1.moment_input=2021-02-24%2023%3A45%3A00&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=5m&g2.end_input=2021-02-24%2023%3A45%3A00&g2.moment_input=2021-02-24%2023%3A45%3A00&g3.expr=async_finish_http_requests&g3.tab=0&g3.stacked=0&g3.range_input=5m&g3.end_input=2021-02-24%2023%3A45%3A00&g3.moment_input=2021-02-24%2023%3A45%3A00
+
+
+---------------------------------------------------
+
+40 req/s
+
+vagrant@node1:~/knative-test$ hey -disable-keepalive -c 40 -q 1 -n 4000 "http://192.168.33.154:8080/asynctest?sleep=300&prime=100000&bloat=10"
+
+Summary:
+  Total:        100.1784 secs
+  Slowest:      1.0823 secs
+  Fastest:      0.0013 secs
+  Average:      0.1238 secs
+  Requests/sec: 39.9288
+
+  Total data:   379841 bytes
+  Size/request: 94 bytes
+
+Response time histogram:
+  0.001 [1]     |
+  0.109 [2471]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.217 [981]   |■■■■■■■■■■■■■■■■
+  0.326 [278]   |■■■■■
+  0.434 [118]   |■■
+  0.542 [73]    |■
+  0.650 [41]    |■
+  0.758 [13]    |
+  0.866 [20]    |
+  0.974 [3]     |
+  1.082 [1]     |
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=3m&g0.end_input=2021-02-26%2012%3A55%3A40&g0.moment_input=2021-02-26%2012%3A55%3A40&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=3m&g1.end_input=2021-02-26%2012%3A55%3A40&g1.moment_input=2021-02-26%2012%3A55%3A40&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=3m&g2.end_input=2021-02-26%2012%3A55%3A40&g2.moment_input=2021-02-26%2012%3A55%3A40&g3.expr=async_finish_http_requests&g3.tab=0&g3.stacked=0&g3.range_input=3m&g3.end_input=2021-02-26%2012%3A55%3A40&g3.moment_input=2021-02-26%2012%3A55%3A40
+
+
+
+4 req/s + CPU
+---------------
+
+vagrant@node1:~/knative-test$ hey -disable-keepalive -c 4 -q 1 -n 1000 "http://192.168.33.154:8080/asynctest?sleep=500&prime=10000000&bloat=60"
+
+Summary:
+  Total:        251.0443 secs
+  Slowest:      1.8237 secs
+  Fastest:      0.0007 secs
+  Average:      0.2043 secs
+  Requests/sec: 3.9834
+
+  Total data:   95781 bytes
+  Size/request: 95 bytes
+
+Response time histogram:
+  0.001 [1]     |
+  0.183 [695]   |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.365 [97]    |■■■■■■
+  0.548 [63]    |■■■■
+  0.730 [63]    |■■■■
+  0.912 [30]    |■■
+  1.095 [27]    |■■
+  1.277 [13]    |■
+  1.459 [3]     |
+  1.641 [6]     |
+  1.824 [2]     |
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=6m&g0.end_input=2021-02-26%2013%3A12%3A30&g0.moment_input=2021-02-26%2013%3A12%3A30&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=6m&g1.end_input=2021-02-26%2013%3A12%3A30&g1.moment_input=2021-02-26%2013%3A12%3A30&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=6m&g2.end_input=2021-02-26%2013%3A12%3A30&g2.moment_input=2021-02-26%2013%3A12%3A30&g3.expr=async_finish_http_requests&g3.tab=0&g3.stacked=0&g3.range_input=6m&g3.end_input=2021-02-26%2013%3A12%3A30&g3.moment_input=2021-02-26%2013%3A12%3A30
+
+
+
+Sync
+-----
+
+vagrant@node1:~/keda$ hey -disable-keepalive -c 20 -q 1 -n 4000 "http://192.168.33.154:8080/synctest?sleep=300&prime=100000&bloat=10"
+
+Summary:
+  Total:        200.3616 secs
+  Slowest:      0.8902 secs
+  Fastest:      0.3029 secs
+  Average:      0.3555 secs
+  Requests/sec: 19.9639
+
+  Total data:   382680 bytes
+  Size/request: 95 bytes
+
+Response time histogram:
+  0.303 [1]     |
+  0.362 [2862]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.420 [844]   |■■■■■■■■■■■■
+  0.479 [152]   |■■
+  0.538 [78]    |■
+  0.597 [33]    |
+  0.655 [9]     |
+  0.714 [5]     |
+  0.773 [5]     |
+  0.831 [4]     |
+  0.890 [7]     |
+
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(sync_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=5m&g0.end_input=2021-02-24%2016%3A45%3A38&g0.moment_input=2021-02-24%2016%3A45%3A38&g1.expr=rate(sync_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=5m&g1.end_input=2021-02-24%2016%3A45%3A38&g1.moment_input=2021-02-24%2016%3A45%3A38&g2.expr=sync_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=5m&g2.end_input=2021-02-24%2016%3A45%3A38&g2.moment_input=2021-02-24%2016%3A45%3A38
+
+
+
+Queue
+-----
+
+
+http://192.168.33.153:9090/graph?g0.expr=avg(rate(async_http_requests%5B5s%5D))&g0.tab=0&g0.stacked=1&g0.range_input=5m&g0.end_input=2021-02-24%2023%3A45%3A00&g0.moment_input=2021-02-24%2023%3A45%3A00&g1.expr=rate(async_http_requests%5B5s%5D)&g1.tab=0&g1.stacked=1&g1.range_input=5m&g1.end_input=2021-02-24%2023%3A45%3A00&g1.moment_input=2021-02-24%2023%3A45%3A00&g2.expr=async_http_requests&g2.tab=0&g2.stacked=0&g2.range_input=5m&g2.end_input=2021-02-24%2023%3A45%3A00&g2.moment_input=2021-02-24%2023%3A45%3A00&g3.expr=async_finish_http_requests&g3.tab=0&g3.stacked=0&g3.range_input=5m&g3.end_input=2021-02-24%2023%3A45%3A00&g3.moment_input=2021-02-24%2023%3A45%3A00
+
+
+--------------------------------------
+
+https://dev.to/anirudhgarg_99/scale-up-and-down-a-http-triggered-function-app-in-kubernetes-using-keda-4m42
+
+
+
+----------------
+https://medium.com/faun/writing-your-first-kubernetes-operator-8f3df4453234
+https://medium.com/swlh/kubernetes-operator-for-beginners-what-why-how-21b23f0cb9b1
+https://kubernetes.io/docs/concepts/architecture/controller/
+https://kubebuilder.io/quick-start.html#create-an-api
+
+Disable Knative scaling
+and scale the underlying deployment yourself
+---------------------------
+
+KnixWorkflow Operator
+
+Only install istio, then create our own deployment (pods), service (logical endpoint for pods), virtualservice (ingress route), hpa (scaler, via keda+prometheus)
+
+-----------------
+
+create a cpu scaler and then and update hpa
+
+------------------------------------------------------
+Creating an operator
+--------------------
+
+Install GO
+----------
+wget https://golang.org/dl/go1.16.linux-amd64.tar.gz
+tar -C /usr/local -xzf go1.16.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.16.linux-amd64.tar.gz
+vi ~/.bashrc
+  export GOPATH="$HOME/go"
+  export GOBIN="$GOPATH/bin"
+  export PATH="$PATH:/home/vagrant/istio-1.9.0/bin:/usr/local/go/bin:/usr/local/kubebuilder/bin"
+source ~/.bashrc
+mkdir -p ~/go/{bin,src,pkg}
+
+Update go
+---------
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf /local/downloads/go1.16.linux-amd64.tar.gz
+
+
+[NOT NEEDED, Install Operator-framework]
+mkdir -p $GOPATH/src/github.com/operator-framework
+cd $GOPATH/src/github.com/operator-framework
+git clone https://github.com/operator-framework/operator-sdk
+cd operator-sdk/
+make build operator-sdk
+cd operator-framework/
+sudo cp ./operator-sdk /usr/local/bin/.
+
+Install Kubebuilder
+---------------------
+mkdir kubebuilder
+cd kubebuilder/
+os=$(go env GOOS)
+arch=$(go env GOARCH)
+curl -L https://go.kubebuilder.io/dl/2.3.1/${os}/${arch} --output kubebuilder_2.3.1_linux_amd64.tar.gz
+tar -zxvf kubebuilder_2.3.1_linux_amd64.tar.gz
+sudo cp -r ./kubebuilder_2.3.1_linux_amd64 /usr/local/kubebuilder
+
+Install kustomize
+-----------------
+curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+sudo cp ./kustomize /usr/local/bin/.
+
+
+Create a sample operator
+-------------------------
+(https://github.com/DirectXMan12/kubebuilder-workshops/tree/kubecon-eu-2019)
+(https://book.kubebuilder.io/cronjob-tutorial/controller-overview.html)
+
+mkdir $GOPATH/src/testop
+cd $GOPATH/src/testop
+kubebuilder init --domain paarijaat.net
+go get github.com/go-logr/logr@v0.1.0
+go get github.com/onsi/ginkgo@v1.11.0
+go get github.com/onsi/gomega@v1.8.1
+go get k8s.io/api/core/v1@v0.17.2
+kubebuilder create api --group test --version v1 --kind Guestbook
+
+make
+make manifests
+  /home/vagrant/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+
+
+make install
+  kustomize build config/crd
+k get guestbook -A
+k api-resources
+
+
+
+
+Knative cutom class
+---------------------
+https://www.youtube.com/watch?v=sh9mfUExX9o
+
+cat test_controller.json | awk '{print $0}' | jq -r '"[\(.timestamp)] [\(.["logging.googleapis.com/sourceLocation"])] \(.message)"' > hpa_and_test_controller.log
+
+cat test_controller.json | awk '{print $0}' | jq -r '"[\(.timestamp)] [\(.["caller"])] [\(.["knative.dev/controller"])] \(.message)"' > hpa_and_test_controller.log
+
+HPA:
+After:  2021-03-05T15:44:24.890432694Z
+After:  2021-03-05T15:44:32.855633102Z   (in hpa_autoscaler_log)
+Before: 2021-03-05T15:44:37.833283191Z
+
+
+
+Test:
+After:  2021-03-05T15:52:19.419598568Z
+Before: 2021-03-05T15:52:30.469228413Z
+
+
+
+
+PTEST controller:
+After: 2021-03-08T14:42:14.863894456Z"
+
+Building Knative
+------------------
+
+    start the devcluster
+    --------------------
+    /local/work/k3d/start.sh
+    make sure the registry container comes up
+
+cd ~
+VERSION=0.8.1 OS=Linux ARCH=x86_64 curl -L https://github.com/google/ko/releases/download/v${VERSION}/ko_${VERSION}_${OS}_${ARCH}.tar.gz | tar xzf - ko
+sudo mv ./ko /usr/local/bin/.
+export KO_DOCKER_REPO=localhost:33551
+
+mkdir -p ~/go/src/knative.dev
+cd ~/go/src/knative.dev
+git clone https://github.com/knative/serving.git
+cd serving
+
+(https://github.com/google/ko/issues/64#issuecomment-514347653)
+export KO_DOCKER_REPO=localhost:33551
+ko resolve -f config/core/deployments/controller.yaml 
+ko resolve -f config/hpa-autoscaling/controller.yaml > serving-hpa-dev.yaml
+ko resolve -f config/ptest-autoscaling/controller.yaml > serving-ptest-dev.yaml
+vi serving-ptest-dev.yaml
+spec:
+  template:
+    spec:
+      containers:
+        image: k3d-devcluster-registry:5000/autoscaler-ptest-...    <-- THIS
+
+
+https://blog.tianfeiyu.com/2020/10/08/knative_serving/
+https://freecontent.manning.com/introducing-knative-serving/
+
+https://medium.com/knative/knative-v0-3-autoscaling-a-love-story-d6954279a67a
+https://github.com/josephburnett/kubecon18/blob/master/yolo/main.go
+
+https://github.com/kubernetes/sample-controller
+https://github.com/xcoulon/podset-operator
+https://medium.com/faun/writing-your-first-kubernetes-operator-8f3df4453234
+
+Log file: C:\local\work\knative\knative-test\correct_and_incorrect_class_controller.logs
+2021-03-02T13:23:27.49129525Z   kpa working
+2021-03-02T13:25:23.035012481Z test.paarijaat.net not working
+
+
+
+
+
+useful commands
+----------------
+To see the version of a package available in apt:
+sudo apt-cache madison docker-ce
+
+To see hostPort port being mapped
+sudo iptables -L --line-numbers -t nat -v
+
+To restart calico nodes:
+kubectl set env daemonset/calico-node -n kube-system IP_AUTODETECTION_METHOD=interface=enp\*
+
+
+
+
+---------------------
+# [OPTIONAL] setup vscode remote developement ssh config  (C:\users\username\.ssh\config)
+-------------------------------------------------------
+Host node1
+HostName 192.168.33.11
+User vagrant
+ForwardAgent yes
+ForwardX11 yes
+Port 22
+AddressFamily inet
+ConnectTimeout 2
+IdentityFile C:\Users\paditya\.vagrant.d\insecure_private_key
+
+Host node2
+HostName 192.168.33.12
+User vagrant
+ForwardAgent yes
+ForwardX11 yes
+Port 22
+AddressFamily inet
+ConnectTimeout 2
+IdentityFile C:\Users\paditya\.vagrant.d\insecure_private_key
+
+Host node3
+HostName 192.168.33.13
+User vagrant
+ForwardAgent yes
+ForwardX11 yes
+Port 22
+AddressFamily inet
+ConnectTimeout 2
+IdentityFile C:\Users\paditya\.vagrant.d\insecure_private_key
+
+
+
+
+
+main.go for keda-test
+----------------------
+package main
+
+import (
+    "fmt"
+    "math"
+    "math/rand"
+    "net/http"
+    "time"
+
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promauto"
+
+    "github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+var httpSyncRequestsCounter = promauto.NewCounter(prometheus.CounterOpts{
+    Name: "sync_http_requests",
+    Help: "number of sync http requests",
+})
+
+var httpAsyncRequestsCounter = promauto.NewCounter(prometheus.CounterOpts{
+    Name: "async_http_requests",
+    Help: "number of async http requests",
+})
+
+
+func init() {
+}
+
+var jobs chan int
+
+func dowork(i int) {
+    start := time.Now()
+    for c := 0; c < 90000000; c++ {
+        s := math.Sqrt(2*2 + 3*3)
+        s = s + float64(i)
+    }
+
+    v := rand.Intn(100) + 250    // range is min to max
+    time.Sleep(time.Millisecond * time.Duration(v))
+
+    a := make([]int, 100000)
+    for c := 0; c < 100000; c++ {
+        a[c] = c
+    }
+    duration := time.Since(start)
+    fmt.Println(duration)
+}
+
+func worker(jobs <-chan int) {
+    fmt.Println("Register the worker")
+    for i := range jobs {
+        dowork(i)
+    }
+}
+
+func main() {
+    http.Handle("/metrics", promhttp.Handler())
+    http.HandleFunc("/synctest", func(w http.ResponseWriter, r *http.Request) {
+        resp := "Accessed on " + time.Now().String()
+        dowork(1)
+        httpSyncRequestsCounter.Inc()
+        w.Write([]byte(resp))
+        // defer httpSyncRequestsCounter.Inc()
+        // count, err := client.Incr(redisCounterName).Result()
+        // if err != nil {
+        //  fmt.Println("Unable to increment redis counter", err)
+        //  os.Exit(1)
+        // }
+        // resp := "Accessed on " + time.Now().String() + "\nAccess count " + strconv.Itoa(int(count))
+        // w.Write([]byte(resp))
+    })
+    http.HandleFunc("/asynctest", func(w http.ResponseWriter, r *http.Request) {
+        resp := "Accessed on " + time.Now().String()
+        jobs <- 1
+        httpAsyncRequestsCounter.Inc()
+        w.Write([]byte(resp))
+    })
+    jobs = make(chan int, 100)
+    go worker(jobs)
+
+
+    http.ListenAndServe(":8080", nil)
+}
+
+
+
+
+Grafana dashboard model json for keda_test_http_requests
+--------------------------------------------------------
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": 25,
+  "iteration": 1612706236983,
+  "links": [],
+  "panels": [
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "hiddenSeries": false,
+      "id": 29,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "rate(async_http_requests[10s])",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "async_http_requests",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 16,
+      "panels": [],
+      "repeat": null,
+      "title": "Headlines",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "cacheTimeout": null,
+      "colorBackground": false,
+      "colorValue": false,
+      "colors": [
+        "#299c46",
+        "rgba(237, 129, 40, 0.89)",
+        "#d44a3a"
+      ],
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "format": "percentunit",
+      "gauge": {
+        "maxValue": 100,
+        "minValue": 0,
+        "show": false,
+        "thresholdLabels": false,
+        "thresholdMarkers": true
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 9
+      },
+      "id": 1,
+      "interval": null,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "mappingType": 1,
+      "mappingTypes": [
+        {
+          "name": "value to text",
+          "value": 1
+        },
+        {
+          "name": "range to text",
+          "value": 2
+        }
+      ],
+      "maxDataPoints": 100,
+      "nullPointMode": "null as zero",
+      "nullText": null,
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "postfix": "",
+      "postfixFontSize": "50%",
+      "prefix": "",
+      "prefixFontSize": "50%",
+      "rangeMaps": [
+        {
+          "from": "null",
+          "text": "N/A",
+          "to": "null"
+        }
+      ],
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "sparkline": {
+        "fillColor": "rgba(31, 118, 189, 0.18)",
+        "full": false,
+        "lineColor": "rgb(31, 120, 193)",
+        "show": false,
+        "ymax": null,
+        "ymin": null
+      },
+      "stack": false,
+      "steppedLine": false,
+      "tableColumn": "",
+      "targets": [
+        {
+          "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate{cluster=\"$cluster\", namespace=\"$namespace\"}) / sum(kube_pod_container_resource_requests_cpu_cores{cluster=\"$cluster\", namespace=\"$namespace\"})",
+          "format": "time_series",
+          "instant": true,
+          "intervalFactor": 2,
+          "refId": "A"
+        }
+      ],
+      "thresholds": "70,80",
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "CPU Utilisation (from requests)",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "singlestat",
+      "valueFontSize": "80%",
+      "valueMaps": [
+        {
+          "op": "=",
+          "text": "N/A",
+          "value": "null"
+        }
+      ],
+      "valueName": "avg",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ]
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "cacheTimeout": null,
+      "colorBackground": false,
+      "colorValue": false,
+      "colors": [
+        "#299c46",
+        "rgba(237, 129, 40, 0.89)",
+        "#d44a3a"
+      ],
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "format": "percentunit",
+      "gauge": {
+        "maxValue": 100,
+        "minValue": 0,
+        "show": false,
+        "thresholdLabels": false,
+        "thresholdMarkers": true
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 6,
+        "y": 9
+      },
+      "id": 2,
+      "interval": null,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "mappingType": 1,
+      "mappingTypes": [
+        {
+          "name": "value to text",
+          "value": 1
+        },
+        {
+          "name": "range to text",
+          "value": 2
+        }
+      ],
+      "maxDataPoints": 100,
+      "nullPointMode": "null as zero",
+      "nullText": null,
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "postfix": "",
+      "postfixFontSize": "50%",
+      "prefix": "",
+      "prefixFontSize": "50%",
+      "rangeMaps": [
+        {
+          "from": "null",
+          "text": "N/A",
+          "to": "null"
+        }
+      ],
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "sparkline": {
+        "fillColor": "rgba(31, 118, 189, 0.18)",
+        "full": false,
+        "lineColor": "rgb(31, 120, 193)",
+        "show": false,
+        "ymax": null,
+        "ymin": null
+      },
+      "stack": false,
+      "steppedLine": false,
+      "tableColumn": "",
+      "targets": [
+        {
+          "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate{cluster=\"$cluster\", namespace=\"$namespace\"}) / sum(kube_pod_container_resource_limits_cpu_cores{cluster=\"$cluster\", namespace=\"$namespace\"})",
+          "format": "time_series",
+          "instant": true,
+          "intervalFactor": 2,
+          "refId": "A"
+        }
+      ],
+      "thresholds": "70,80",
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "CPU Utilisation (from limits)",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "singlestat",
+      "valueFontSize": "80%",
+      "valueMaps": [
+        {
+          "op": "=",
+          "text": "N/A",
+          "value": "null"
+        }
+      ],
+      "valueName": "avg",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ]
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "cacheTimeout": null,
+      "colorBackground": false,
+      "colorValue": false,
+      "colors": [
+        "#299c46",
+        "rgba(237, 129, 40, 0.89)",
+        "#d44a3a"
+      ],
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "format": "percentunit",
+      "gauge": {
+        "maxValue": 100,
+        "minValue": 0,
+        "show": false,
+        "thresholdLabels": false,
+        "thresholdMarkers": true
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 12,
+        "y": 9
+      },
+      "id": 3,
+      "interval": null,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "mappingType": 1,
+      "mappingTypes": [
+        {
+          "name": "value to text",
+          "value": 1
+        },
+        {
+          "name": "range to text",
+          "value": 2
+        }
+      ],
+      "maxDataPoints": 100,
+      "nullPointMode": "null as zero",
+      "nullText": null,
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "postfix": "",
+      "postfixFontSize": "50%",
+      "prefix": "",
+      "prefixFontSize": "50%",
+      "rangeMaps": [
+        {
+          "from": "null",
+          "text": "N/A",
+          "to": "null"
+        }
+      ],
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "sparkline": {
+        "fillColor": "rgba(31, 118, 189, 0.18)",
+        "full": false,
+        "lineColor": "rgb(31, 120, 193)",
+        "show": false,
+        "ymax": null,
+        "ymin": null
+      },
+      "stack": false,
+      "steppedLine": false,
+      "tableColumn": "",
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{cluster=\"$cluster\", namespace=\"$namespace\",container!=\"\", image!=\"\"}) / sum(kube_pod_container_resource_requests_memory_bytes{namespace=\"$namespace\"})",
+          "format": "time_series",
+          "instant": true,
+          "intervalFactor": 2,
+          "refId": "A"
+        }
+      ],
+      "thresholds": "70,80",
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Memory Utilization (from requests)",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "singlestat",
+      "valueFontSize": "80%",
+      "valueMaps": [
+        {
+          "op": "=",
+          "text": "N/A",
+          "value": "null"
+        }
+      ],
+      "valueName": "avg",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ]
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "cacheTimeout": null,
+      "colorBackground": false,
+      "colorValue": false,
+      "colors": [
+        "#299c46",
+        "rgba(237, 129, 40, 0.89)",
+        "#d44a3a"
+      ],
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "format": "percentunit",
+      "gauge": {
+        "maxValue": 100,
+        "minValue": 0,
+        "show": false,
+        "thresholdLabels": false,
+        "thresholdMarkers": true
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 18,
+        "y": 9
+      },
+      "id": 4,
+      "interval": null,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "mappingType": 1,
+      "mappingTypes": [
+        {
+          "name": "value to text",
+          "value": 1
+        },
+        {
+          "name": "range to text",
+          "value": 2
+        }
+      ],
+      "maxDataPoints": 100,
+      "nullPointMode": "null as zero",
+      "nullText": null,
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "postfix": "",
+      "postfixFontSize": "50%",
+      "prefix": "",
+      "prefixFontSize": "50%",
+      "rangeMaps": [
+        {
+          "from": "null",
+          "text": "N/A",
+          "to": "null"
+        }
+      ],
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "sparkline": {
+        "fillColor": "rgba(31, 118, 189, 0.18)",
+        "full": false,
+        "lineColor": "rgb(31, 120, 193)",
+        "show": false,
+        "ymax": null,
+        "ymin": null
+      },
+      "stack": false,
+      "steppedLine": false,
+      "tableColumn": "",
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{cluster=\"$cluster\", namespace=\"$namespace\",container!=\"\", image!=\"\"}) / sum(kube_pod_container_resource_limits_memory_bytes{namespace=\"$namespace\"})",
+          "format": "time_series",
+          "instant": true,
+          "intervalFactor": 2,
+          "refId": "A"
+        }
+      ],
+      "thresholds": "70,80",
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Memory Utilisation (from limits)",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "singlestat",
+      "valueFontSize": "80%",
+      "valueMaps": [
+        {
+          "op": "=",
+          "text": "N/A",
+          "value": "null"
+        }
+      ],
+      "valueName": "avg",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 17,
+      "panels": [],
+      "repeat": null,
+      "title": "CPU Usage",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "hiddenSeries": false,
+      "id": 5,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "quota - requests",
+          "color": "#F2495C",
+          "dashes": true,
+          "fill": 0,
+          "hideTooltip": true,
+          "legend": false,
+          "linewidth": 2,
+          "stack": false
+        },
+        {
+          "alias": "quota - limits",
+          "color": "#FF9830",
+          "dashes": true,
+          "fill": 0,
+          "hideTooltip": true,
+          "legend": false,
+          "linewidth": 2,
+          "stack": false
+        }
+      ],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate{cluster=\"$cluster\", namespace=\"$namespace\"}) by (pod)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod}}",
+          "legendLink": null,
+          "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "scalar(kube_resourcequota{cluster=\"$cluster\", namespace=\"$namespace\", type=\"hard\",resource=\"requests.cpu\"})",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "quota - requests",
+          "legendLink": null,
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "scalar(kube_resourcequota{cluster=\"$cluster\", namespace=\"$namespace\", type=\"hard\",resource=\"limits.cpu\"})",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "quota - limits",
+          "legendLink": null,
+          "refId": "C",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "CPU Usage",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 19,
+      "panels": [],
+      "repeat": null,
+      "title": "Memory Usage",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "hiddenSeries": false,
+      "id": 7,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "quota - requests",
+          "color": "#F2495C",
+          "dashes": true,
+          "fill": 0,
+          "hideTooltip": true,
+          "legend": false,
+          "linewidth": 2,
+          "stack": false
+        },
+        {
+          "alias": "quota - limits",
+          "color": "#FF9830",
+          "dashes": true,
+          "fill": 0,
+          "hideTooltip": true,
+          "legend": false,
+          "linewidth": 2,
+          "stack": false
+        }
+      ],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{cluster=\"$cluster\", namespace=\"$namespace\", container!=\"\", image!=\"\"}) by (pod)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod}}",
+          "legendLink": null,
+          "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "scalar(kube_resourcequota{cluster=\"$cluster\", namespace=\"$namespace\", type=\"hard\",resource=\"requests.memory\"})",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "quota - requests",
+          "legendLink": null,
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "scalar(kube_resourcequota{cluster=\"$cluster\", namespace=\"$namespace\", type=\"hard\",resource=\"limits.memory\"})",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "quota - limits",
+          "legendLink": null,
+          "refId": "C",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Memory Usage (w/o cache)",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "bytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 20,
+      "panels": [],
+      "repeat": null,
+      "title": "Memory Quota",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "columns": [],
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fontSize": "100%",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 8,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "pageSize": null,
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "showHeader": true,
+      "sort": {
+        "col": 0,
+        "desc": true
+      },
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "styles": [
+        {
+          "alias": "Time",
+          "align": "auto",
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "pattern": "Time",
+          "type": "hidden"
+        },
+        {
+          "alias": "Memory Usage",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #A",
+          "thresholds": [],
+          "type": "number",
+          "unit": "bytes"
+        },
+        {
+          "alias": "Memory Requests",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #B",
+          "thresholds": [],
+          "type": "number",
+          "unit": "bytes"
+        },
+        {
+          "alias": "Memory Requests %",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #C",
+          "thresholds": [],
+          "type": "number",
+          "unit": "percentunit"
+        },
+        {
+          "alias": "Memory Limits",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #D",
+          "thresholds": [],
+          "type": "number",
+          "unit": "bytes"
+        },
+        {
+          "alias": "Memory Limits %",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #E",
+          "thresholds": [],
+          "type": "number",
+          "unit": "percentunit"
+        },
+        {
+          "alias": "Memory Usage (RSS)",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #F",
+          "thresholds": [],
+          "type": "number",
+          "unit": "bytes"
+        },
+        {
+          "alias": "Memory Usage (Cache)",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #G",
+          "thresholds": [],
+          "type": "number",
+          "unit": "bytes"
+        },
+        {
+          "alias": "Memory Usage (Swap)",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #H",
+          "thresholds": [],
+          "type": "number",
+          "unit": "bytes"
+        },
+        {
+          "alias": "Pod",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": true,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "./d/6581e46e4e5c7ba40a07646395ef7b23/k8s-resources-pod?var-datasource=$datasource&var-cluster=$cluster&var-namespace=$namespace&var-pod=$__cell",
+          "pattern": "pod",
+          "thresholds": [],
+          "type": "number",
+          "unit": "short"
+        },
+        {
+          "alias": "",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "pattern": "/.*/",
+          "thresholds": [],
+          "type": "string",
+          "unit": "short"
+        }
+      ],
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{cluster=\"$cluster\", namespace=\"$namespace\",container!=\"\", image!=\"\"}) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "sum(kube_pod_container_resource_requests_memory_bytes{cluster=\"$cluster\", namespace=\"$namespace\"}) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "sum(container_memory_working_set_bytes{cluster=\"$cluster\", namespace=\"$namespace\",container!=\"\", image!=\"\"}) by (pod) / sum(kube_pod_container_resource_requests_memory_bytes{namespace=\"$namespace\"}) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "C",
+          "step": 10
+        },
+        {
+          "expr": "sum(kube_pod_container_resource_limits_memory_bytes{cluster=\"$cluster\", namespace=\"$namespace\"}) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "D",
+          "step": 10
+        },
+        {
+          "expr": "sum(container_memory_working_set_bytes{cluster=\"$cluster\", namespace=\"$namespace\",container!=\"\", image!=\"\"}) by (pod) / sum(kube_pod_container_resource_limits_memory_bytes{namespace=\"$namespace\"}) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "E",
+          "step": 10
+        },
+        {
+          "expr": "sum(container_memory_rss{cluster=\"$cluster\", namespace=\"$namespace\",container!=\"\"}) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "F",
+          "step": 10
+        },
+        {
+          "expr": "sum(container_memory_cache{cluster=\"$cluster\", namespace=\"$namespace\",container!=\"\"}) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "G",
+          "step": 10
+        },
+        {
+          "expr": "sum(container_memory_swap{cluster=\"$cluster\", namespace=\"$namespace\",container!=\"\"}) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "H",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Memory Quota",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "transform": "table",
+      "type": "table-old",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "id": 21,
+      "panels": [],
+      "repeat": null,
+      "title": "Network",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "columns": [],
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fontSize": "100%",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 9,
+      "interval": "1m",
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "pageSize": null,
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "showHeader": true,
+      "sort": {
+        "col": 0,
+        "desc": true
+      },
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "styles": [
+        {
+          "alias": "Time",
+          "align": "auto",
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "pattern": "Time",
+          "type": "hidden"
+        },
+        {
+          "alias": "Current Receive Bandwidth",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #A",
+          "thresholds": [],
+          "type": "number",
+          "unit": "Bps"
+        },
+        {
+          "alias": "Current Transmit Bandwidth",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #B",
+          "thresholds": [],
+          "type": "number",
+          "unit": "Bps"
+        },
+        {
+          "alias": "Rate of Received Packets",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #C",
+          "thresholds": [],
+          "type": "number",
+          "unit": "pps"
+        },
+        {
+          "alias": "Rate of Transmitted Packets",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #D",
+          "thresholds": [],
+          "type": "number",
+          "unit": "pps"
+        },
+        {
+          "alias": "Rate of Received Packets Dropped",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #E",
+          "thresholds": [],
+          "type": "number",
+          "unit": "pps"
+        },
+        {
+          "alias": "Rate of Transmitted Packets Dropped",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": false,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down",
+          "linkUrl": "",
+          "pattern": "Value #F",
+          "thresholds": [],
+          "type": "number",
+          "unit": "pps"
+        },
+        {
+          "alias": "Pod",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "link": true,
+          "linkTargetBlank": false,
+          "linkTooltip": "Drill down to pods",
+          "linkUrl": "./d/6581e46e4e5c7ba40a07646395ef7b23/k8s-resources-pod?var-datasource=$datasource&var-cluster=$cluster&var-namespace=$namespace&var-pod=$__cell",
+          "pattern": "pod",
+          "thresholds": [],
+          "type": "number",
+          "unit": "short"
+        },
+        {
+          "alias": "",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "pattern": "/.*/",
+          "thresholds": [],
+          "type": "string",
+          "unit": "short"
+        }
+      ],
+      "targets": [
+        {
+          "expr": "sum(irate(container_network_receive_bytes_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "sum(irate(container_network_transmit_bytes_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "sum(irate(container_network_receive_packets_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "C",
+          "step": 10
+        },
+        {
+          "expr": "sum(irate(container_network_transmit_packets_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "D",
+          "step": 10
+        },
+        {
+          "expr": "sum(irate(container_network_receive_packets_dropped_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "E",
+          "step": 10
+        },
+        {
+          "expr": "sum(irate(container_network_transmit_packets_dropped_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "table",
+          "instant": true,
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "F",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Current Network Usage",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "transform": "table",
+      "type": "table-old",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "id": 22,
+      "panels": [],
+      "repeat": null,
+      "title": "Network",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "hiddenSeries": false,
+      "id": 10,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(irate(container_network_receive_bytes_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod}}",
+          "legendLink": null,
+          "refId": "A",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Receive Bandwidth",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "Bps",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 23,
+      "panels": [],
+      "repeat": null,
+      "title": "Network",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "hiddenSeries": false,
+      "id": 11,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(irate(container_network_transmit_bytes_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod}}",
+          "legendLink": null,
+          "refId": "A",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Transmit Bandwidth",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "Bps",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "id": 24,
+      "panels": [],
+      "repeat": null,
+      "title": "Network",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "hiddenSeries": false,
+      "id": 12,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(irate(container_network_receive_packets_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod}}",
+          "legendLink": null,
+          "refId": "A",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Rate of Received Packets",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "Bps",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "id": 25,
+      "panels": [],
+      "repeat": null,
+      "title": "Network",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 69
+      },
+      "hiddenSeries": false,
+      "id": 13,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(irate(container_network_transmit_packets_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod}}",
+          "legendLink": null,
+          "refId": "A",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Rate of Transmitted Packets",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "Bps",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
+      "id": 26,
+      "panels": [],
+      "repeat": null,
+      "title": "Network",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 77
+      },
+      "hiddenSeries": false,
+      "id": 14,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(irate(container_network_receive_packets_dropped_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod}}",
+          "legendLink": null,
+          "refId": "A",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Rate of Received Packets Dropped",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "Bps",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 84
+      },
+      "id": 27,
+      "panels": [],
+      "repeat": null,
+      "title": "Network",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      },
+      "hiddenSeries": false,
+      "id": 15,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.5",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(irate(container_network_transmit_packets_dropped_total{cluster=\"$cluster\", namespace=~\"$namespace\"}[$__rate_interval])) by (pod)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod}}",
+          "legendLink": null,
+          "refId": "A",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Rate of Transmitted Packets Dropped",
+      "tooltip": {
+        "shared": false,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "Bps",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": 0,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 26,
+  "style": "dark",
+  "tags": [
+    "kubernetes-mixin"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "default",
+          "value": "default"
+        },
+        "error": null,
+        "hide": 0,
+        "includeAll": false,
+        "label": null,
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "allValue": null,
+        "current": {
+          "isNone": true,
+          "selected": false,
+          "text": "None",
+          "value": ""
+        },
+        "datasource": "$datasource",
+        "definition": "",
+        "error": null,
+        "hide": 2,
+        "includeAll": false,
+        "label": null,
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": "label_values(kube_pod_info, cluster)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tags": [],
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "allValue": null,
+        "current": {
+          "selected": false,
+          "text": "keda-test",
+          "value": "keda-test"
+        },
+        "datasource": "$datasource",
+        "definition": "",
+        "error": null,
+        "hide": 0,
+        "includeAll": false,
+        "label": null,
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": "label_values(kube_pod_info{cluster=\"$cluster\"}, namespace)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tags": [],
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "keda_test_http_requests",
+  "uid": "keda_test_http_requests",
+  "version": 3
+}
