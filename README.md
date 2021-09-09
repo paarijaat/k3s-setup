@@ -370,6 +370,7 @@ $ kubectl delete -f helloworld-python-local-docker-registry.yaml
 
 ## 4. Install istio
 
+### 4.1 Install Istio
 ```bash
 # NOTE istio 1.10.3 is messed up. kube-inject does not work
 $ export ISTIO_VERSION=1.9.7
@@ -422,7 +423,7 @@ $ istioctl kube-inject -f samples/helloworld/helloworld.yaml \
     --valuesFile valuesFile.json
 ```
 
-### Test istio with sample app
+### 4.2 Test istio with sample app
 
 ```bash
 cd samples/helloworld
@@ -432,7 +433,7 @@ kubectl apply -f helloworld-gateway.yaml
 curl http://localhost/hello
 ```
 
-## 5. Install Knative
+## 5. Knative
 
 I have followed instructions from:
 * [Installing Knative Serving using YAML files](https://knative.dev/docs/admin/install/serving/install-serving-with-yaml/)
@@ -442,6 +443,8 @@ I have followed instructions from:
 * [Mount SSL certificates in the Pod with Kubernetes secret](https://faun.pub/mount-ssl-certificates-in-kubernetes-pod-with-secret-8aca220896e6)
 * [How to mount multiple files / secrets into common directory in kubernetes?](https://stackoverflow.com/questions/59079318/how-to-mount-multiple-files-secrets-into-common-directory-in-kubernetes)
 
+
+### 5.1 Install Knative
 
 ```bash
 export KNATIVE_VERSION=0.24.0
@@ -454,7 +457,7 @@ wget https://github.com/knative/serving/releases/download/v${KNATIVE_VERSION}/se
 wget https://github.com/knative/serving/releases/download/v${KNATIVE_VERSION}/serving-default-domain.yaml
 ```
 
-Create a secret for the registry.crt
+### 5.2 Create a secret for the registry.crt (OPTIONAL)
 
 ```bash
 cd certs
@@ -471,7 +474,7 @@ data:
 __EOF__
 ```
 
-Edit config maps in `serving-core.yaml`
+### 5.3 Edit config maps in `serving-core.yaml`
 
 Update the domain name of knative services
 
@@ -495,7 +498,7 @@ or
 kubectl -n knative-serving patch cm config-domain --type "json" --patch '[{"op":"add","path":"/data","value":{"10.0.2.15.sslip.io": ""}}]'
 ```
 
-Update the url structure for knative services
+### 5.4 Update the url structure for knative services
 
 ```yaml
 apiVersion: v1
@@ -512,7 +515,7 @@ data:
   _example: |
 ```
 
-Set logs level to debug (optional)
+### 5.5 Set logs level to debug (OPTIONAL)
 
 ```yaml
 apiVersion: v1
