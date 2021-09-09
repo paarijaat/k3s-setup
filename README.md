@@ -35,7 +35,7 @@ mkdir k3s
 cd k3s
 ```
 
-## 2. Create a local docker registry with TLS and password protection
+## 2. Create a local docker registry with TLS and password protection (OPTIONAL)
 
 ### Creating SSL certificate for docker registry
 
@@ -140,7 +140,9 @@ docker tag paarijaat/ubuntu:latest paarijaat-debian-vm:5000/paarijaat/ubuntu:lat
 docker push paarijaat-debian-vm:5000/paarijaat/ubuntu:latest
 ```
 
-## 3. Start k3s cluster
+## 3. Setup a K3s cluster
+
+### 3.1 Start a single node k3s cluster
 
 ```bash
 ./setup-new-k3s.sh
@@ -174,7 +176,7 @@ cp ~/.kube/config ~/.kube/config.bak || true
 cp ~/.kube/config.k3s ~/.kube/config
 ```
 
-### install K9s, lightweight shell GUI
+### 3.2 install K9s, lightweight shell GUI
 
 Downloads available at: <https://github.com/derailed/k9s/releases>
 
@@ -189,7 +191,7 @@ cp ./.k9s/views.yml ~/.k9s/.
 k9s
 ```
 
-### LoadBalancer service
+### 3.3 Test if LoadBalancer service is working (OPTIONAL)
 
 k3s can create loadbalancer services automatically by deploying a pod that exposes a hostPort and forwards requests to the service cluster ip address
 
@@ -235,9 +237,9 @@ curl http://localhost:80
 kubectl delete -f nginx-lb-service.yaml
 ```
 
-### local-path-provisioner
+### 3.4 Test if `local-path-provisioner` is working (OPTIONAL)
 
-local-path-provisioner is installed automatically and it set as the default storageclass
+`local-path-provisioner` is installed automatically and it set as the default storageclass
 
 ```bash
 # these commands are not needed
@@ -280,7 +282,7 @@ kubectl delete -f https://raw.githubusercontent.com/rancher/local-path-provision
 kubectl delete -f pvc.yaml
 ```
 
-### Check if k8s can pull from the local registry
+### 3.5 Check if k8s can pull from the local registry (OPTIONAL)
 
 #### Create imagePullSecret credential
 
@@ -389,10 +391,10 @@ spec:
   values:
     global:
       logging:
-        level: default:debug
+        level: default:info
       proxy:
         autoInject: disabled
-        logLevel: debug
+        logLevel: info
 ```
 
 ```bash
