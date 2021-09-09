@@ -444,7 +444,7 @@ I have followed instructions from:
 * [How to mount multiple files / secrets into common directory in kubernetes?](https://stackoverflow.com/questions/59079318/how-to-mount-multiple-files-secrets-into-common-directory-in-kubernetes)
 
 
-### 5.1 Install Knative
+### 5.1 Download Knative YAMLs
 
 ```bash
 export KNATIVE_VERSION=0.24.0
@@ -540,7 +540,7 @@ data:
   _example: |
 ```
 
-Edit the `Deployment` of the `controller`:
+### 5.6 Edit the `Deployment` of the `controller` (OPTIONAL, only needed if you want to pull from local registry)
 
 * to mount the secret containing registry certificate as a volume
 * to set the `SSL_CERT_DIR` env variable
@@ -613,7 +613,7 @@ kubectl -n knative-serving patch deployment controller --type "json" --patch '[{
   }]'
 ```
 
-[NOT NEEDED] Edit `net-istio.yaml`
+### 5.7 [NOT NEEDED] Edit `net-istio.yaml`
 
 ```yaml
 apiVersion: v1
@@ -636,7 +636,7 @@ or
 kubectl -n knative-serving patch cm config-istio --type "json" --patch '[{"op":"add","path":"/data/gateway.knative-serving.knative-ingress-gateway","value": "istio-ingressgateway.istio-system.svc.cluster.local"},{"op":"add","path":"/data/local-gateway.knative-serving.cluster-local-gateway","value": "istio-ingressgateway.istio-system.svc.cluster.local"}]'
 ```
 
-Actually install knative
+### 5.8 Actually install knative
 
 ```bash
 kubectl create ns knative-serving
