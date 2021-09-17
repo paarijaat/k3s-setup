@@ -176,7 +176,9 @@ cp ~/.kube/config ~/.kube/config.bak || true
 cp ~/.kube/config.k3s ~/.kube/config
 ```
 
-### 3.2 install K9s, lightweight shell GUI
+### 3.2 install K9s, lightweight shell GUI (OPTIONAL)
+
+Makes life easy while browsing your k8s setup. Helps you avoid typing kubectl commands for basic 'read' operations.
 
 Downloads available at: <https://github.com/derailed/k9s/releases>
 
@@ -186,8 +188,8 @@ wget https://github.com/derailed/k9s/releases/download/v0.24.14/k9s_Linux_x86_64
 tar -zxvf k9s_Linux_x86_64.tar.gz
 sudo cp k9s /usr/local/bin/.
 mkdir -p ~/.k9s
-cp ./.k9s/config ~/.k9s/.
-cp ./.k9s/views.yml ~/.k9s/.
+cp ./.k9s/config.yml ~/.k9s/.   # OPTIONAL files available at: https://github.com/paarijaat/k3s-setup/tree/main/k9s/.k9s
+cp ./.k9s/views.yml ~/.k9s/.    # OPTIONAL files available at: https://github.com/paarijaat/k3s-setup/tree/main/k9s/.k9s
 k9s
 ```
 
@@ -375,12 +377,13 @@ $ kubectl delete -f helloworld-python-local-docker-registry.yaml
 # NOTE istio 1.10.3 is messed up. kube-inject does not work
 $ export ISTIO_VERSION=1.9.7
 $ curl -L https://istio.io/downloadIstio | sh -
-$ export PATH="$PATH:/local/work/k3s-setup/istio-1.9.7/bin"
+# After installation, istio will recommend you adding the path to 'istioctl' in your PATH variable. Copy-paste the command it displays
+$ export PATH="$PATH:/local/work/k3s-setup/istio-1.9.7/bin"   # NOTE: your directory structure may vary
 
 # I followed instructions at: https://istio.io/latest/docs/setup/install/istioctl/
 ```
 
-Create `diff-istio-install-no-mtls-no-inject-debug-logs.yaml`. This will disable auto-injection, disable AutoMtls, and enable debug logs
+Create `diff-istio-install-no-mtls-no-inject-debug-logs.yaml`. This will disable auto-injection, disable AutoMtls
 
 ```yaml
 apiVersion: install.istio.io/v1alpha1
@@ -515,7 +518,7 @@ data:
   _example: |
 ```
 
-### 5.5 Set logs level to debug (OPTIONAL)
+### 5.5 Set logs level to debug (OPTIONAL, debug logs should only be enabled for debug purposes)
 
 ```yaml
 apiVersion: v1
@@ -647,7 +650,7 @@ kubectl apply -f serving-hpa.yaml
 ```
 
 
-### test knative service: 
+### test knative service (OPTIONAL): 
 
 create `helloworld-python-ksvc.yaml`
 
@@ -663,7 +666,7 @@ spec:
       - name: regcred
       containers:
       - name: helloworld
-        image: paarijaat-debian-vm:5000/paarijaat/helloworld-python
+        image: paarijaat/helloworld-python
         resources:
           requests:
             cpu: "100m"
