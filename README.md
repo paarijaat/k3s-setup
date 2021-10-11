@@ -826,6 +826,56 @@ Dypm5HnNMkpY9unki9WqUXr74fjF
 
 **_[NOT NEEDED, since we are using a loadBalancer IP. Otherwise we will need to do this]_** In another shell run `sudo kubectl port-forward --address 0.0.0.0 -n istio-system svc/istio-ingressgateway 80:80`
 
+## 6. Prometheus
+
+### 6.1 Install Prometheus
+Instructions take from [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack#configuration)
+
+```bash
+helm repo add stable https://charts.helm.sh/stable
+helm repo update
+mkdir prometheus; cd prometheus
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+kubectl create ns prometheus
+helm install prometheus prometheus-community/kube-prometheus-stack --namespace prometheus --set defaultRules.rules.alertmanager=false --set alertmanager.enabled=false
+```
+
+### 6.2 Change grafana service to LoadBalancer service
+
+Edit the grafana service to make it a LoadBalancer service listening on port 82
+
+```bash
+kubectl -n prometheus edit svc prometheus-grafana
+(changes marked as # <--- THIS)
+```
+
+```yaml
+  ports:
+  - name: service
+    nodePort: 30646
+    port: 82   # <--- THIS
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app.kubernetes.io/instance: prometheus
+    app.kubernetes.io/name: grafana
+  sessionAffinity: None
+  type: LoadBalancer    # <--- THIS
+```
+
+
+After this you can access grafana at: `http://10.0.2.15:82/`
+`user: admin`
+`pass: prom-operator`
+
+### 6.3 Access grafana via port forwarding (OPTIONAL)
+
+```bash
+kubectl -n prometheus --address 0.0.0.0 port-forward service/prometheus-grafana 3000:82
+```
+
+Open browser: `http://localhost:3000/`
 
 ---
 ---
