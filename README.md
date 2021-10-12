@@ -37,6 +37,8 @@ cd k3s
 
 ## 2. Create a local docker registry with TLS and password protection (OPTIONAL)
 
+Note: Starting the registry after k3s has started seems to be creating a problem while pulling images from the registry. Kubelet gives a `x509: certificate signed by unknown authority` error. K3s doesnt seem to be picking up the newly added CA cert correctly once after it has started.
+
 ### Creating SSL certificate for docker registry
 
 Notes below follow instructions from: 
